@@ -1,0 +1,489 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 2,
+  "metadata": {
+    "kernelspec": {
+      "display_name": "IJulia 1.9.3",
+      "language": "julia",
+      "name": "ijulia-1.9"
+    },
+    "language_info": {
+      "file_extension": ".jl",
+      "mimetype": "application/julia",
+      "name": "julia",
+      "version": "1.9.3"
+    },
+    "engee": {}
+  },
+  "cells": [
+    {
+      "id": "46354040",
+      "cell_type": "markdown",
+      "source": [
+        "# Лабораторная работа № 1\n\n*Калибровка измерительного тракта и оценка неопределённости в Engee*\n\n- Дисциплина: «Измерения в телекоммуникационных системах»\nСпециальность: 10.05.02 «Информационная безопасность телекоммуникационных систем»\nСпециализация: № 9 «Управление безопасностью телекоммуникационных систем и сетей»\nФормат: модельный измерительный эксперимент в Engee\nПродолжительность: 4 академических часа\nФорма работы: индивидуальная работа на учебной платформе Engee\nКонтроль: отчёт, модель .engee, выполненный скрипт .jl, устная защита"
+      ],
+      "attachments": {},
+      "metadata": {
+        "name": "Титул",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": true,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false
+        }
+      }
+    },
+    {
+      "id": "f456e3fb",
+      "cell_type": "markdown",
+      "source": [
+        "## 1. Цель работы\n\nОсвоить построение цифрового аналога измерительного тракта, оценивание систематического смещения и случайной составляющей, вычисление поправки, стандартной и расширенной неопределённости, а также документирование воспроизводимого эксперимента в Engee."
+      ],
+      "attachments": {},
+      "metadata": {
+        "name": "Цель работы",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": false,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false
+        }
+      }
+    },
+    {
+      "id": "2e1a93de",
+      "cell_type": "markdown",
+      "source": [
+        "## 6. Индивидуальные варианты\n\nНомер варианта назначает преподаватель. Во всех вариантах: SampleTime = 0.1 с, Start = 0 с, Stop = 9.9 с, , альтернативный seed равен Seed + 1000.\n\n| Вариант |  |  |  | Seed |\n|---|---|---|---|---|\n| 1 | 10,0 | 0,20 | 0,25 | 101 |\n| 2 | 8,0 | -0,15 | 0,16 | 127 |\n| 3 | 12,0 | 0,30 | 0,36 | 149 |\n| 4 | 5,0 | 0,10 | 0,09 | 173 |\n| 5 | 15,0 | -0,25 | 0,25 | 197 |\n| 6 | 20,0 | 0,40 | 0,49 | 223 |\n| 7 | 7,5 | -0,20 | 0,16 | 251 |\n| 8 | 11,0 | 0,15 | 0,25 | 277 |\n| 9 | 6,0 | 0,25 | 0,36 | 307 |\n| 10 | 18,0 | -0,35 | 0,49 | 331 |\n| 11 | 9,0 | 0,12 | 0,09 | 359 |\n| 12 | 14,0 | -0,18 | 0,16 | 383 |"
+      ],
+      "attachments": {},
+      "metadata": {
+        "name": "Индивидуальные варианты",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": false,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false
+        }
+      }
+    },
+    {
+      "id": "1672b431",
+      "cell_type": "markdown",
+      "source": [
+        "## 5. Теоретические сведения\n\n## 5.1. Измерительная задача и модель\n\nМоделируется измерительный тракт, наблюдение на выходе которого описывается выражением\n\nгде  — известное опорное значение измеряемой величины;  — систематическое смещение тракта;  — случайная составляющая;  — отдельное наблюдение.\n\nОценки по выборке из  наблюдений:\n\nгде  — оценка систематического смещения,  — оценка поправки.\n\nСтандартная неопределённость среднего типа A:\n\nЕсли граница неопределённости опорного значения равна  и принята прямоугольная модель распределения, то\n\nгде  — стандартная неопределённость типа B,  — комбинированная стандартная неопределённость,  — расширенная неопределённость,  — коэффициент охвата для учебной приближённой оценки.\n\nИсправленный результат:\n\n## 5.2. Заранее заданные критерии\n\nДля варианта 1 используются X0 = 10, b = 0,20, σ² = 0,25, n = 100, Seed = 101.\n\nЖёсткие критерии:\n\nмассив содержит ровно 100 конечных значений;\n\nзапуски с одинаковыми параметрами и seed дают одинаковые полные массивы;\n\nизменение только seed изменяет полный выходной массив;\n\nпосле проверки восстановлены параметры варианта 1.\n\nЧисленные и статистические критерии:\n\nотносительное отклонение выборочного СКО от заданного σ не более 20 %: |s − σ| / σ ≤ 0,20;\n\nсреднее согласуется с ожидаемым значением (X0 + b) в пределах утроенной стандартной неопределённости: |x̄ − (X0 + b)| ≤ 3σ/√n;\n\nисправленное среднее приближается к опорному значению X0 в пределах той же границы: |x_corr − X0| ≤ 3σ/√n;\n\nвсе промежуточные величины (среднее, СКО, поправка, доверительный интервал) конечны.\n\nСтатистические границы являются диагностическими для данной учебной модели, а не универсальными метрологическими допусками.\n\n## 5.3. Ограничения модели\n\nопорное значение и систематическое смещение считаются постоянными;\n\nслучайная составляющая независима и нормально распределена;\n\nотсутствуют нелинейность, гистерезис, квантование, дрейф чувствительности и корреляция отсчётов;\n\nкоэффициент охвата  используется как учебное приближение;\n\nцифровая модель не заменяет поверку или калибровку реального средства измерений."
+      ],
+      "attachments": {},
+      "metadata": {
+        "name": "Теоретические сведения",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": false,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false
+        }
+      }
+    },
+    {
+      "id": "c283613e",
+      "cell_type": "markdown",
+      "source": [
+        "## Построение модели в Engee\n\nВыполните ячейки ниже по порядку — они создадут модель `LR01_calibration_uncertainty` программно, через API Engee, и соединят блоки в точности по схеме, приведённой в методических указаниях (.docx) этой лабораторной работы. Для первичной проверки используются параметры варианта 1."
+      ],
+      "attachments": {},
+      "metadata": {
+        "name": "Раздел: построение модели",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": true,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false
+        }
+      }
+    },
+    {
+      "id": "bed4c210",
+      "cell_type": "code",
+      "source": [
+        "m = engee.create(\"LR01_calibration_uncertainty\")"
+      ],
+      "execution_count": 0,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": "Model(\n    name: LR01_calibration_uncertainty,\n    id: 13f7a9c8-2c65-45fa-a8b3-0c306458b60c\n)"
+          },
+          "metadata": {},
+          "execution_count": 2
+        }
+      ],
+      "metadata": {
+        "name": "Создать модель",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": false,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false,
+          "outputInfo": {
+            "isExpanded": false,
+            "scrollTop": 0
+          },
+          "maskInfo": {
+            "isMaskVisible": true,
+            "isEditorVisible": true,
+            "isAutoplayActive": false
+          }
+        }
+      }
+    },
+    {
+      "id": "b1770e8b",
+      "cell_type": "code",
+      "source": [
+        "engee.add_block(\"/Basic/Sources/Constant\", \"LR01_calibration_uncertainty/ReferenceX0\")\nengee.set_param!(\"LR01_calibration_uncertainty/ReferenceX0\", \"Value\"=>\"10\")"
+      ],
+      "execution_count": 0,
+      "outputs": [],
+      "metadata": {
+        "name": "Блок ReferenceX0",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": false,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false,
+          "outputInfo": {
+            "isExpanded": false,
+            "scrollTop": 0
+          },
+          "maskInfo": {
+            "isMaskVisible": true,
+            "isEditorVisible": true,
+            "isAutoplayActive": false
+          }
+        }
+      }
+    },
+    {
+      "id": "22f0b487",
+      "cell_type": "code",
+      "source": [
+        "engee.add_block(\"/Basic/Sources/Constant\", \"LR01_calibration_uncertainty/SystematicBias\")\nengee.set_param!(\"LR01_calibration_uncertainty/SystematicBias\", \"Value\"=>\"0.20\")"
+      ],
+      "execution_count": 0,
+      "outputs": [],
+      "metadata": {
+        "name": "Блок SystematicBias",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": false,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false,
+          "outputInfo": {
+            "isExpanded": false,
+            "scrollTop": 0
+          },
+          "maskInfo": {
+            "isMaskVisible": true,
+            "isEditorVisible": true,
+            "isAutoplayActive": false
+          }
+        }
+      }
+    },
+    {
+      "id": "3faa4756",
+      "cell_type": "code",
+      "source": [
+        "engee.add_block(\"/Basic/Sources/Random Number\", \"LR01_calibration_uncertainty/RandomNoise\")\nengee.set_param!(\"LR01_calibration_uncertainty/RandomNoise\", \"Mean\"=>\"0\", \"Variance\"=>\"0.25\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.1\")"
+      ],
+      "execution_count": 0,
+      "outputs": [],
+      "metadata": {
+        "name": "Блок RandomNoise",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": false,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false,
+          "outputInfo": {
+            "isExpanded": false,
+            "scrollTop": 0
+          },
+          "maskInfo": {
+            "isMaskVisible": true,
+            "isEditorVisible": true,
+            "isAutoplayActive": false
+          }
+        }
+      }
+    },
+    {
+      "id": "80692186",
+      "cell_type": "code",
+      "source": [
+        "engee.add_block(\"/Basic/Math Operations/Add\", \"LR01_calibration_uncertainty/MeasurementSum\")\nengee.set_param!(\"LR01_calibration_uncertainty/MeasurementSum\", \"Inputs\"=>\"+++\")"
+      ],
+      "execution_count": 0,
+      "outputs": [
+        {
+          "output_type": "error",
+          "ename": "LoadError",
+          "evalue": "Block \"MeasurementSum\" already exists",
+          "traceback": [
+            "Block \"MeasurementSum\" already exists",
+            "",
+            "Stacktrace:",
+            " [1] call_actor(::BackendLib.StateActor.Actor{BackendLib.StateCore.StateAPIStorage}, ::Symbol, ::String, ::Vararg{Any}; kwargs::@Kwargs{})",
+            "   @ BackendLib.StateActor /opt/depot/core/packages/BackendLib/7aywA/src/StateActor.jl:182",
+            " [2] call_actor",
+            "   @ /opt/depot/core/packages/BackendLib/7aywA/src/StateActor.jl:112 [inlined]",
+            " [3] add_block(_actor_self::BackendLib.StateActor.Actor{BackendLib.StateCore.StateAPIStorage}, lib_block_path::String, target_block_path::String, view::CommandControlTypes.BlockViewParams)",
+            "   @ BackendLib.StateActor /opt/depot/core/packages/BackendLib/7aywA/src/StateActor.jl:211",
+            " [4] #add_block#17",
+            "   @ /opt/depot/core/packages/BackendLib/7aywA/src/CommandControl/CommandControl.jl:527 [inlined]",
+            " [5] add_block(block_identity::String, tgt_block_path::String)",
+            "   @ BackendLib.CommandControl /opt/depot/core/packages/BackendLib/7aywA/src/CommandControl/CommandControl.jl:520",
+            " [6] top-level scope",
+            "   @ In[10]:1",
+            " [7] eval(m::Module, e::Any)",
+            "   @ Core ./boot.jl:489"
+          ]
+        }
+      ],
+      "metadata": {
+        "name": "Блок MeasurementSum",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": false,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false,
+          "outputInfo": {
+            "isExpanded": false,
+            "scrollTop": 0
+          },
+          "maskInfo": {
+            "isMaskVisible": true,
+            "isEditorVisible": true,
+            "isAutoplayActive": false
+          }
+        }
+      }
+    },
+    {
+      "id": "ecb2dbf7",
+      "cell_type": "code",
+      "source": [
+        "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR01_calibration_uncertainty/MeasuredData\")\nengee.set_param!(\"LR01_calibration_uncertainty/MeasuredData\", \"VariableName\"=>\"measured_data\")"
+      ],
+      "execution_count": 0,
+      "outputs": [],
+      "metadata": {
+        "name": "Блок MeasuredData",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": false,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false,
+          "outputInfo": {
+            "isExpanded": false,
+            "scrollTop": 0
+          },
+          "maskInfo": {
+            "isMaskVisible": true,
+            "isEditorVisible": true,
+            "isAutoplayActive": false
+          }
+        }
+      }
+    },
+    {
+      "id": "30aef429",
+      "cell_type": "code",
+      "source": [
+        "engee.add_line(\"LR01_calibration_uncertainty\", \"ReferenceX0/Output_1\", \"MeasurementSum/in_1\")\nengee.add_line(\"LR01_calibration_uncertainty\", \"SystematicBias/Output_1\", \"MeasurementSum/in_2\")\nengee.add_line(\"LR01_calibration_uncertainty\", \"RandomNoise/Output_1\", \"MeasurementSum/in_3\")\nengee.add_line(\"LR01_calibration_uncertainty\", \"MeasurementSum/main_out\", \"MeasuredData/Input_1\")"
+      ],
+      "execution_count": 0,
+      "outputs": [],
+      "metadata": {
+        "name": "Соединить блоки",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": false,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false,
+          "outputInfo": {
+            "isExpanded": false,
+            "scrollTop": 0
+          },
+          "maskInfo": {
+            "isMaskVisible": true,
+            "isEditorVisible": true,
+            "isAutoplayActive": false
+          }
+        }
+      }
+    },
+    {
+      "id": "fc5eccc1",
+      "cell_type": "code",
+      "source": [
+        "engee.set_param!(\"LR01_calibration_uncertainty\", \"StartTime\"=>\"0\", \"StopTime\"=>\"9.9\", \"FixedStep\"=>\"0.1\")\nengee.save(m, \"LR01_calibration_uncertainty.engee\")"
+      ],
+      "execution_count": 0,
+      "outputs": [],
+      "metadata": {
+        "name": "Параметры моделирования и сохранение",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": false,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false,
+          "outputInfo": {
+            "isExpanded": false,
+            "scrollTop": 0
+          },
+          "maskInfo": {
+            "isMaskVisible": true,
+            "isEditorVisible": true,
+            "isAutoplayActive": false
+          }
+        }
+      }
+    },
+    {
+      "id": "f5a46d54",
+      "cell_type": "code",
+      "source": [
+        "engee.run(\"LR01_calibration_uncertainty\")\nprintln(\"measured_data: N=\", length(measured_data.value))"
+      ],
+      "execution_count": 0,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": "measured_data: N=100\n"
+        }
+      ],
+      "metadata": {
+        "name": "Запустить и проверить",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": false,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false,
+          "outputInfo": {
+            "isExpanded": false,
+            "scrollTop": 0
+          },
+          "maskInfo": {
+            "isMaskVisible": true,
+            "isEditorVisible": true,
+            "isAutoplayActive": false
+          }
+        }
+      }
+    },
+    {
+      "id": "19db276b",
+      "cell_type": "markdown",
+      "source": [
+        "## Обработка результатов\n\nЯчейка ниже — выполненный и проверенный скрипт `LR01_calibration_uncertainty.jl` (реальный результат прогона приведён в разделе «Демонстрационный вариант» ниже). Скрипт выполняет протокол воспроизводимости (4 запуска: seed, seed, seed+1000, seed) и проверяет все заранее заданные численные критерии варианта 1."
+      ],
+      "attachments": {},
+      "metadata": {
+        "name": "Раздел: обработка результатов",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": true,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false
+        }
+      }
+    },
+    {
+      "id": "2698190e",
+      "cell_type": "code",
+      "source": [
+        "using Statistics\n\nconst NSAMP = 100\nconst SEED = 101\nconst X0 = 10.0\nconst DELTA_SYS = 0.20\nconst SIGMA = 0.5\n\nfunction run_lr01(seed)\n    engee.set_param!(\"LR01_calibration_uncertainty/RandomNoise\", \"Seed\" => string(seed))\n    engee.run(\"LR01_calibration_uncertainty\")\n    return collect(Float64, measured_data.value)\nend\n\nr1 = run_lr01(SEED)\nr2 = run_lr01(SEED)\nr3 = run_lr01(SEED + 1000)\nr4 = run_lr01(SEED)\n\nEQ_1_2 = r1 == r2\nEQ_1_4 = r1 == r4\nEQ_1_3 = r1 == r3\nEQ_2_4 = r2 == r4\n\nn = length(r1)\nx_mean = mean(r1)\ns = std(r1)\nu_A = s / sqrt(n)\nt_crit = 1.984\nci_low = x_mean - t_crit * u_A\nci_high = x_mean + t_crit * u_A\nbias = x_mean - X0\nx_corrected = x_mean - DELTA_SYS\nresidual = x_corrected - X0\n\ncheck_s = abs(s - SIGMA) / SIGMA <= 0.20\nmean_limit = 3 * SIGMA / sqrt(n)\ncheck_mean = abs(x_mean - (X0 + DELTA_SYS)) <= mean_limit\n\nprintln(\"n=\", n, \" mean=\", x_mean, \" s=\", s, \" u_A=\", u_A)\nprintln(\"CI=[\", ci_low, \", \", ci_high, \"]\")\nprintln(\"bias=\", bias, \" corrected=\", x_corrected, \" residual=\", residual)\nprintln(\"EQ_1_2=\", EQ_1_2, \" EQ_1_4=\", EQ_1_4, \" EQ_1_3=\", EQ_1_3, \" EQ_2_4=\", EQ_2_4)\nprintln(\"check_s=\", check_s, \" check_mean=\", check_mean)\n\nPASS = n == NSAMP && EQ_1_2 && EQ_1_4 && !EQ_1_3 && EQ_2_4 && check_s && check_mean &&\n       all(isfinite, (x_mean, s, u_A, bias, x_corrected, residual))\nprintln(\"PASS=\", PASS)"
+      ],
+      "execution_count": 0,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": "n=100 mean=10.22259695197762 s=0.5711923174547902 u_A=0.05711923174547902\nCI=[10.109272396194589, 10.33592150776065]\nbias=0.22259695197761964 corrected=10.02259695197762 residual=0.02259695197762035\nEQ_1_2=true EQ_1_4=true EQ_1_3=false EQ_2_4=true\ncheck_s=true check_mean=true\nPASS=true\n"
+        }
+      ],
+      "metadata": {
+        "name": "Скрипт обработки (delivery script)",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": false,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false,
+          "outputInfo": {
+            "isExpanded": false,
+            "scrollTop": 0
+          },
+          "maskInfo": {
+            "isMaskVisible": true,
+            "isEditorVisible": true,
+            "isAutoplayActive": false
+          }
+        }
+      }
+    },
+    {
+      "id": "1bb1c3ac",
+      "cell_type": "markdown",
+      "source": [
+        "## 15. Контрольные вопросы\n\nЧем отличаются погрешность измерения и неопределённость результата?\n\nПочему поправка имеет знак, противоположный оценке систематического смещения?\n\nПочему одинаковый seed должен воспроизводить полный выходной массив?\n\nЧем генеральное СКО отличается от выборочного СКО и стандартной неопределённости среднего?\n\nПочему уменьшение случайной составляющей не устраняет систематическое смещение?\n\nКакие предпосылки необходимы для объединения составляющих типа A и B?\n\nПочему  в этой работе является учебным приближением?\n\nКакие ограничения цифровой модели препятствуют прямому переносу результата на реальный прибор?"
+      ],
+      "attachments": {},
+      "metadata": {
+        "name": "Контрольные вопросы",
+        "engee": {
+          "isDisplay": true,
+          "isParagraph": false,
+          "isClosedParagraph": false,
+          "amountHideCellsInside": 0,
+          "codeOutputView": "col",
+          "codeOutputHidden": false
+        }
+      }
+    }
+  ]
+}

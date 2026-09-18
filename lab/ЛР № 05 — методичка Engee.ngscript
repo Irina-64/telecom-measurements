@@ -1,0 +1,698 @@
+{
+ "nbformat": 4,
+ "nbformat_minor": 2,
+ "metadata": {
+  "kernelspec": {
+   "display_name": "IJulia 1.9.3",
+   "language": "julia",
+   "name": "ijulia-1.9"
+  },
+  "language_info": {
+   "file_extension": ".jl",
+   "mimetype": "application/julia",
+   "name": "julia",
+   "version": "1.9.3"
+  },
+  "engee": {}
+ },
+ "cells": [
+  {
+   "id": "5fe8ad76",
+   "cell_type": "markdown",
+   "source": [
+    "# Лабораторная работа № 5\n",
+    "\n",
+    "*Оценка спектра сигнала с учётом взвешивающих окон*\n",
+    "\n",
+    "- Продолжение темы «Моделирование генератора, формы, спектра и шума сигнала» (часть 2)\n",
+    "- Дисциплина: «Измерения в телекоммуникационных системах»\n",
+    "- Специальность: 10.05.02 «Информационная безопасность телекоммуникационных систем»\n",
+    "- Специализация: № 9 «Управление безопасностью телекоммуникационных систем и сетей»\n",
+    "- Формат: модельный измерительный эксперимент в Engee\n",
+    "- Продолжительность: 2 академических часа\n",
+    "- Форма работы: индивидуальная работа на учебной платформе Engee\n",
+    "- Контроль: отчёт, модель LR05_spectral_windowing.engee, выполненный скрипт LR05_spectral_windowing.jl, устная защита"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Титул",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "ec7d0f34",
+   "cell_type": "markdown",
+   "source": [
+    "## 1. Цель работы\n",
+    "\n",
+    "Освоить применение взвешивающих окон для снижения спектральной утечки при оценке частоты и амплитуды сигнала, частота которого не кратна шагу частотного бина периодограммы. Работа продолжает тему ЛР № 2 и устраняет её явно заявленное ограничение: «частотное разрешение спектральной оценки не учитывает взвешивающие окна»."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Цель работы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "76393f5b",
+   "cell_type": "markdown",
+   "source": [
+    "## 6. Индивидуальные варианты\n",
+    "\n",
+    "Номер варианта назначает преподаватель. Во всех вариантах: SampleTime = 0,01 с, Start = 0 с, Stop = 9,99 с (N = 1000, fs = 100 Гц), Fixed step решателя = 0,01 с, phi0 = 0 рад, альтернативный seed равен Seed + 1000, зондовый бин фиксирован на 7,0 Гц (бин № 70). Частота f0 всегда оканчивается на «,X5» — ровно посередине между бинами периодограммы, что гарантирует максимальную утечку. Вариант 1 зарезервирован для демонстрационного прогона (раздел 18.5) и не выдаётся студентам как расчётный.\n",
+    "\n",
+    "| Вариант | A0 | f0, Гц | σ² | Seed |\n",
+    "|---|---|---|---|---|\n",
+    "| 1 | 2,0 | 5,25 | 0,01 | 101 |\n",
+    "| 2 | 1,5 | 8,15 | 0,005625 | 127 |\n",
+    "| 3 | 3,0 | 3,05 | 0,0225 | 149 |\n",
+    "| 4 | 1,0 | 2,55 | 0,0025 | 173 |\n",
+    "| 5 | 2,5 | 6,35 | 0,015625 | 197 |\n",
+    "| 6 | 4,0 | 12,45 | 0,04 | 223 |\n",
+    "| 7 | 1,2 | 3,35 | 0,0036 | 251 |\n",
+    "| 8 | 2,2 | 5,15 | 0,0121 | 277 |\n",
+    "| 9 | 1,8 | 4,05 | 0,0081 | 307 |\n",
+    "| 10 | 3,5 | 10,25 | 0,030625 | 331 |\n",
+    "| 11 | 1,6 | 5,55 | 0,0064 | 359 |\n",
+    "| 12 | 2,8 | 8,05 | 0,0196 | 383 |\n",
+    "| 13 | 2,1 | 5,35 | 0,011025 | 409 |\n",
+    "| 14 | 1,4 | 7,25 | 0,0049 | 433 |\n",
+    "| 15 | 3,2 | 9,15 | 0,0256 | 457 |\n",
+    "| 16 | 0,9 | 2,85 | 0,002025 | 479 |\n",
+    "| 17 | 2,6 | 6,75 | 0,0169 | 503 |\n",
+    "| 18 | 3,8 | 11,05 | 0,0361 | 541 |\n",
+    "| 19 | 1,1 | 4,35 | 0,003025 | 563 |\n",
+    "| 20 | 2,4 | 5,65 | 0,0144 | 587 |\n",
+    "| 21 | 3,4 | 9,55 | 0,0289 | 613 |\n",
+    "| 22 | 1,9 | 4,85 | 0,009025 | 641 |\n",
+    "| 23 | 4,4 | 13,05 | 0,0484 | 659 |"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Индивидуальные варианты",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "351fa177",
+   "cell_type": "markdown",
+   "source": [
+    "## 5. Теоретические сведения\n",
+    "\n",
+    "## 5.1. Измерительная задача и модель\n",
+    "\n",
+    "Модель совпадает по структуре с моделью ЛР № 2: генератор гармонического сигнала с аддитивным шумом.\n",
+    "\n",
+    "y[n] = A0 * sin(2*pi*f0*n*Ts + phi0) + w[n],   n = 0, 1, ..., N-1\n",
+    "\n",
+    "Отличие от ЛР № 2 — принципиальное: частота f0 намеренно выбрана НЕ кратной шагу частотного бина Δf = fs/N (в данной работе f0 всегда оканчивается на «,X5», то есть находится ровно посередине между двумя соседними бинами). Это гарантированно проявляет спектральную утечку, изученную в лекции 5.\n",
+    "\n",
+    "## 5.2. Периодограмма с прямоугольным и взвешивающим окном\n",
+    "\n",
+    "Прямоугольная (обычная) периодограмма вычисляется без предварительной обработки сигнала:\n",
+    "\n",
+    "Y_rect[k] = FFT(y)[k],   P_rect[k] = |Y_rect[k]|^2 / N\n",
+    "\n",
+    "Периодограмма с окном Хэннинга вычисляется после умножения сигнала на окно w[n] = 0,5·(1 − cos(2πn/(N−1))) с последующей коррекцией на когерентное усиление окна cg = mean(w):\n",
+    "\n",
+    "y_w[n] = y[n] * w[n]\n",
+    "Y_w[k] = FFT(y_w)[k]\n",
+    "P_w[k] = |Y_w[k]|^2 / (N * cg^2 * N)\n",
+    "\n",
+    "Оценка частоты в обоих случаях — по номеру бина с максимумом мощности среди k = 1, ..., N/2:\n",
+    "\n",
+    "f_hat = argmax(P[1:N/2]) * fs / N\n",
+    "\n",
+    "Мера утечки в данной работе — значение периодограммы в заранее выбранном «зондовом» бине, удалённом от сигнала (в варианте 1 — бин № 70, что соответствует частоте 7,0 Гц при f0 = 5,25 Гц). Отношение утечки с окном к утечке без окна количественно показывает эффективность подавления боковых лепестков:\n",
+    "\n",
+    "leakage_ratio = P_w[probe_bin] / P_rect[probe_bin]\n",
+    "\n",
+    "## 5.3. Заранее заданные критерии\n",
+    "\n",
+    "Для варианта 1 используются A0 = 2,0, f0 = 5,25 Гц (ω0 = 2π·f0 = 32,986723 рад/с), σ² = 0,01, N = 1000, fs = 100 Гц, зондовый бин № 70 (7,0 Гц).\n",
+    "\n",
+    "Жёсткие критерии:\n",
+    "\n",
+    "- массив содержит ровно 1000 конечных значений;\n",
+    "\n",
+    "- запуски с одинаковыми параметрами и seed дают одинаковые полные массивы;\n",
+    "\n",
+    "- изменение только seed изменяет полный выходной массив;\n",
+    "\n",
+    "- после проверки восстановлены параметры варианта 1.\n",
+    "\n",
+    "Численные и статистические критерии (вариант 1):\n",
+    "\n",
+    "- оценка частоты по прямоугольному окну f_rect согласуется с f0 в пределах одного бина (|f_rect − f0| ≤ 0,15 Гц);\n",
+    "\n",
+    "- оценка частоты по окну Хэннинга f_hann согласуется с f0 в тех же пределах;\n",
+    "\n",
+    "- отношение утечки leakage_ratio < 0,01 (окно должно дать не менее чем 100-кратное подавление в зондовом бине).\n",
+    "\n",
+    "Статистические границы являются диагностическими для данной учебной модели, а не универсальными метрологическими допусками.\n",
+    "\n",
+    "## 5.4. Ограничения модели\n",
+    "\n",
+    "- амплитуда, частота и фаза генератора считаются постоянными на интервале наблюдения;\n",
+    "\n",
+    "- используется единственное окно (Хэннинга); сравнение с окнами Хэмминга или Блэкмана в данной работе не выполняется;\n",
+    "\n",
+    "- коэффициент когерентного усиления окна вычислен для конкретной длины N = 1000 и не универсален для другой длины реализации;\n",
+    "\n",
+    "- зондовый бин выбран заранее как фиксированный номер, а не как максимум бокового лепестка — это упрощение, достаточное для учебной демонстрации;\n",
+    "\n",
+    "- цифровая модель не заменяет поверку или калибровку реального анализатора спектра."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Теоретические сведения",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "28c63ff1",
+   "cell_type": "markdown",
+   "source": [
+    "## Построение модели в Engee\n",
+    "\n",
+    "Выполните ячейки ниже по порядку — они создадут модель `LR05_spectral_windowing` программно, через API Engee, и соединят блоки в точности по схеме, приведённой в методических указаниях (.docx) этой лабораторной работы. Для первичной проверки используются параметры варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: построение модели",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "814f5986",
+   "cell_type": "code",
+   "source": [
+    "m = engee.create(\"LR05_spectral_windowing\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Создать модель",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "21ad1789",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Sine Wave\", \"LR05_spectral_windowing/SineGenerator\")\n",
+    "engee.set_param!(\"LR05_spectral_windowing/SineGenerator\", \"Amplitude\"=>\"2.0\", \"Frequency\"=>\"32.986723\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок SineGenerator",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "2adb5692",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR05_spectral_windowing/RandomNoise\")\n",
+    "engee.set_param!(\"LR05_spectral_windowing/RandomNoise\", \"Mean\"=>\"0\", \"Variance\"=>\"0.01\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок RandomNoise",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "aefc997c",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR05_spectral_windowing/SignalSum\")\n",
+    "engee.set_param!(\"LR05_spectral_windowing/SignalSum\", \"Inputs\"=>\"++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок SignalSum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "4cd9f1ec",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR05_spectral_windowing/GeneratedSignal\")\n",
+    "engee.set_param!(\"LR05_spectral_windowing/GeneratedSignal\", \"VariableName\"=>\"generated_signal\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок GeneratedSignal",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "ebe26ecd",
+   "cell_type": "code",
+   "source": [
+    "engee.add_line(\"LR05_spectral_windowing\", \"SineGenerator/main_out\", \"SignalSum/in_1\")\n",
+    "engee.add_line(\"LR05_spectral_windowing\", \"RandomNoise/Output_1\", \"SignalSum/in_2\")\n",
+    "engee.add_line(\"LR05_spectral_windowing\", \"SignalSum/main_out\", \"GeneratedSignal/Input_1\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Соединить блоки",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "ea18e148",
+   "cell_type": "code",
+   "source": [
+    "engee.set_param!(\"LR05_spectral_windowing\", \"StartTime\"=>\"0\", \"StopTime\"=>\"9.99\", \"FixedStep\"=>\"0.01\")\n",
+    "engee.save(m, \"LR05_spectral_windowing.engee\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Параметры моделирования и сохранение",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "a6dad0ed",
+   "cell_type": "code",
+   "source": [
+    "engee.run(\"LR05_spectral_windowing\")\n",
+    "println(\"generated_signal: N=\", length(generated_signal.value))"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Запустить и проверить",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "bdd3c1dc",
+   "cell_type": "markdown",
+   "source": [
+    "## Обработка результатов\n",
+    "\n",
+    "Ячейка ниже — выполненный и проверенный скрипт `LR05_spectral_windowing.jl` (реальный результат прогона приведён в разделе «Демонстрационный вариант» ниже). Скрипт выполняет протокол воспроизводимости (4 запуска: seed, seed, seed+1000, seed) и проверяет все заранее заданные численные критерии варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: обработка результатов",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "a2897c93",
+   "cell_type": "code",
+   "source": [
+    "using Statistics\n",
+    "using FFTW\n",
+    "\n",
+    "const MODEL_NAME = \"LR05_spectral_windowing\"\n",
+    "const RANDOM_BLOCK_PATH = \"LR05_spectral_windowing/RandomNoise\"\n",
+    "const BASE_SEED = 101\n",
+    "const ALT_SEED = BASE_SEED + 1000\n",
+    "const EXPECTED_LENGTH = 1000\n",
+    "const FS = 100.0\n",
+    "const PROBE_BIN = 70\n",
+    "\n",
+    "function run_model_and_extract()\n",
+    "    engee.run(MODEL_NAME)\n",
+    "        x = Float64.(collect(generated_signal).value)\n",
+    "            @assert !isempty(x) \"Выход generated_signal пуст\"\n",
+    "    @assert length(x) == EXPECTED_LENGTH \"Неожиданная длина выхода\"\n",
+    "    @assert all(isfinite, x) \"Выход содержит NaN или Inf\"\n",
+    "        return x\n",
+    "end\n",
+    "\n",
+    "function set_seed!(seed::Integer)\n",
+    "    engee.set_param!(RANDOM_BLOCK_PATH, \"Seed\" => string(seed))\n",
+    "    end\n",
+    "    \n",
+    "    function window_metrics(x)\n",
+    "        N = length(x)\n",
+    "            half = 1:div(N,2)\n",
+    "                Yr = fft(x)\n",
+    "                    Pr = abs2.(Yr) ./ N\n",
+    "    k0r = argmax(Pr[half .+ 1])\n",
+    "    f_rect = k0r * FS / N\n",
+    "    w = [0.5*(1-cos(2*pi*(n-1)/(N-1))) for n in 1:N]\n",
+    "    xw = x .* w\n",
+    "    Yw = fft(xw)\n",
+    "    cg = sum(w)/N\n",
+    "        Pw = abs2.(Yw) ./ (N * cg^2 * N)\n",
+    "            k0w = argmax(Pw[half .+ 1])\n",
+    "    f_hann = k0w * FS / N\n",
+    "        leakage_rect = Pr[PROBE_BIN]\n",
+    "    leakage_hann = Pw[PROBE_BIN]\n",
+    "        leakage_ratio = leakage_hann / leakage_rect\n",
+    "            return (n=N, f_rect=f_rect, f_hann=f_hann, leakage_rect=leakage_rect, leakage_hann=leakage_hann, leakage_ratio=leakage_ratio)\n",
+    "            end\n",
+    "            \n",
+    "            function check_numeric_acceptance(m)\n",
+    "                @assert isapprox(m.f_rect, 5.25; atol=0.15) \"Частота (прямоугольное окно) вне допуска\"\n",
+    "                    @assert isapprox(m.f_hann, 5.25; atol=0.15) \"Частота (Hann) вне допуска\"\n",
+    "                        @assert m.leakage_ratio < 0.01 \"Окно Hann не дало ожидаемого снижения утечки\"\n",
+    "                            return true\n",
+    "end\n",
+    "\n",
+    "println(\"MODEL = \", MODEL_NAME)\n",
+    "println(\"SEEDS = \", (BASE_SEED, BASE_SEED, ALT_SEED, BASE_SEED))\n",
+    "\n",
+    "set_seed!(BASE_SEED)\n",
+    "x1 = run_model_and_extract()\n",
+    "m1 = window_metrics(x1)\n",
+    "\n",
+    "set_seed!(BASE_SEED)\n",
+    "x2 = run_model_and_extract()\n",
+    "m2 = window_metrics(x2)\n",
+    "\n",
+    "set_seed!(ALT_SEED)\n",
+    "x3 = run_model_and_extract()\n",
+    "m3 = window_metrics(x3)\n",
+    "\n",
+    "set_seed!(BASE_SEED)\n",
+    "x4 = run_model_and_extract()\n",
+    "m4 = window_metrics(x4)\n",
+    "\n",
+    "eq_1_2 = x1 == x2\n",
+    "eq_1_4 = x1 == x4\n",
+    "eq_1_3 = x1 == x3\n",
+    "eq_2_4 = x2 == x4\n",
+    "\n",
+    "@assert eq_1_2 \"Запуски 1 и 2 при одинаковом seed различаются\"\n",
+    "@assert eq_1_4 \"После восстановления seed выход не воспроизведён\"\n",
+    "@assert !eq_1_3 \"Изменение seed не изменило полный выходной массив\"\n",
+    "@assert eq_2_4 \"Запуски 2 и 4 при одинаковом seed различаются\"\n",
+    "\n",
+    "check_numeric_acceptance(m1)\n",
+    "check_numeric_acceptance(m2)\n",
+    "check_numeric_acceptance(m4)\n",
+    "\n",
+    "set_seed!(BASE_SEED)\n",
+    "engee.save(MODEL_NAME, MODEL_NAME * \".engee\"; force=true)\n",
+    "\n",
+    "println(\"RUN_1 = \", m1)\n",
+    "println(\"RUN_2 = \", m2)\n",
+    "println(\"RUN_3 = \", m3)\n",
+    "println(\"RUN_4 = \", m4)\n",
+    "println(\"EQ_1_2 = \", eq_1_2)\n",
+    "println(\"EQ_1_4 = \", eq_1_4)\n",
+    "println(\"EQ_1_3 = \", eq_1_3)\n",
+    "println(\"EQ_2_4 = \", eq_2_4)\n",
+    "println(\"PASS: модель и критерии варианта 1 проверены; параметры восстановлены\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Скрипт обработки (delivery script)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "d862e4a3",
+   "cell_type": "markdown",
+   "source": [
+    "## 15. Контрольные вопросы\n",
+    "\n",
+    "- Почему частота в этой работе намеренно выбрана небин-кратной?\n",
+    "\n",
+    "- Почему прямоугольное окно даёт наибольшую утечку именно при частоте посередине между бинами?\n",
+    "\n",
+    "- За счёт чего окно Хэннинга снижает мощность в удалённых от сигнала бинах?\n",
+    "\n",
+    "- Какой ценой достигается снижение боковых лепестков при применении окна?\n",
+    "\n",
+    "- Зачем при вычислении периодограммы с окном нужна коррекция на когерентное усиление?\n",
+    "\n",
+    "- Почему одинаковый seed должен воспроизводить полный выходной массив?\n",
+    "\n",
+    "- Как изменится leakage_rect, если частота сигнала точно совпадёт с бином?\n",
+    "\n",
+    "- Почему оценка частоты по пику спектра одинаково ограничена шириной бина и для прямоугольного, и для взвешенного окна?\n",
+    "\n",
+    "- Чем эта работа отличается от ЛР № 2 по решаемой измерительной задаче?\n",
+    "\n",
+    "- Какие ограничения цифровой модели препятствуют прямому переносу результата на реальный анализатор спектра?"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Контрольные вопросы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "6d02ad75",
+   "cell_type": "markdown",
+   "source": [
+    "## Раздел для преподавателя: демонстрационный вариант\n",
+    "\n",
+    "Вариант 1 зарезервирован исключительно для демонстрационного прогона и не выдаётся студентам как расчётный (раздел 6). Приведённый ниже прогон подтверждает, что комплект работоспособен целиком: модель фактически создана и соединена в Engee, доставляемый скрипт фактически выполнен в этой среде без ошибок, а результат прошёл все заранее заданные критерии приёмки.\n",
+    "\n",
+    "Ход выполнения:\n",
+    "\n",
+    "- модель LR05_spectral_windowing создана программно (engee.create) и заполнена блоками Sine Wave, Random Number, Add и To Workspace — по структуре, идентичной ЛР № 2, но с намеренно небин-кратной частотой f0 = 5,25 Гц;\n",
+    "\n",
+    "- блоки соединены линиями (engee.add_line) по схеме раздела 7; шаг решателя (Fixed step) установлен равным шагу дискретизации блоков (0,01 с); модель сохранена и экспортирована в LR05_spectral_windowing.engee;\n",
+    "\n",
+    "- скрипт LR05_spectral_windowing.jl выполнен целиком через include() непосредственно в среде Engee 26.8.2-H3;\n",
+    "\n",
+    "- скрипт выполнил четыре запуска модели (seed 101, 101, 1101, 101), для каждого вычислил периодограмму с прямоугольным окном и с окном Хэннинга, оценил частоту по обоим окнам и количественно сравнил утечку в зондовом бине, сравнил полные выходные массивы и проверил численные критерии раздела 5.3;\n",
+    "\n",
+    "- после проверки вариант 1 восстановлен (Seed = 101), модель повторно сохранена.\n",
+    "\n",
+    "Фактический вывод скрипта (консоль Engee):\n",
+    "\n",
+    "MODEL = LR05_spectral_windowing\n",
+    "SEEDS = (101, 101, 1101, 101)\n",
+    "\n",
+    "| Запуск | Seed | n | f_rect, Гц | f_hann, Гц | leakage_rect | leakage_hann | leakage_ratio |\n",
+    "|---|---|---|---|---|---|---|---|\n",
+    "| 1 | 101 | 1000 | 5,2 | 5,2 | 0,3288 | 1,2185e-5 | 3,7057e-5 |\n",
+    "| 2 | 101 | 1000 | 5,2 | 5,2 | 0,3288 | 1,2185e-5 | 3,7057e-5 |\n",
+    "| 3 | 1101 | 1000 | 5,2 | 5,2 | 0,2719 | 1,2792e-5 | 4,7047e-5 |\n",
+    "| 4 | 101 | 1000 | 5,2 | 5,2 | 0,3288 | 1,2185e-5 | 3,7057e-5 |\n",
+    "\n",
+    "Проверка воспроизводимости полных выходных массивов:\n",
+    "\n",
+    "EQ_1_2 = true   EQ_1_4 = true   EQ_1_3 = false   EQ_2_4 = true\n",
+    "PASS: модель и критерии варианта 1 проверены; параметры восстановлены\n",
+    "\n",
+    "Результат демонстрационного прогона совпадает с ориентирами раздела 17: окно Хэннинга снизило мощность в зондовом бине примерно в 27 000 раз по сравнению с прямоугольным окном, при этом оценка частоты по обоим методам осталась в пределах одного бина от номинала. Это подтверждает, что комплект LR05_spectral_windowing может быть выдан студентам в текущем виде."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Демонстрационный вариант (для преподавателя)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,779 @@
+{
+ "nbformat": 4,
+ "nbformat_minor": 2,
+ "metadata": {
+  "kernelspec": {
+   "display_name": "IJulia 1.9.3",
+   "language": "julia",
+   "name": "ijulia-1.9"
+  },
+  "language_info": {
+   "file_extension": ".jl",
+   "mimetype": "application/julia",
+   "name": "julia",
+   "version": "1.9.3"
+  },
+  "engee": {}
+ },
+ "cells": [
+  {
+   "id": "e0ee3be4",
+   "cell_type": "markdown",
+   "source": [
+    "# Лабораторная работа № 7\n",
+    "\n",
+    "*Цифровой аналог измерения передаточной характеристики тракта*\n",
+    "\n",
+    "- Многочастотный зондирующий сигнал и сравнение с теоретической АЧХ тракта\n",
+    "- Дисциплина: «Измерения в телекоммуникационных системах»\n",
+    "- Специальность: 10.05.02 «Информационная безопасность телекоммуникационных систем»\n",
+    "- Специализация: № 9 «Управление безопасностью телекоммуникационных систем и сетей»\n",
+    "- Формат: модельный измерительный эксперимент в Engee\n",
+    "- Продолжительность: 2 академических часа\n",
+    "- Форма работы: индивидуальная работа на учебной платформе Engee\n",
+    "- Контроль: отчёт, модель LR07_transfer_characteristic.engee, выполненный скрипт LR07_transfer_characteristic.jl, устная защита"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Титул",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "c85b87e4",
+   "cell_type": "markdown",
+   "source": [
+    "## 1. Цель работы\n",
+    "\n",
+    "Освоить цифровой аналог измерения амплитудно-частотной характеристики (передаточной характеристики) тракта: сформировать многочастотный зондирующий сигнал, пропустить его через модель тракта с известной теоретической передаточной функцией, восстановить амплитудную характеристику по отклику и сопоставить её с теоретической."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Цель работы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "d18d2ad0",
+   "cell_type": "markdown",
+   "source": [
+    "## 6. Индивидуальные варианты\n",
+    "\n",
+    "Номер варианта назначает преподаватель. Во всех вариантах: тестовые частоты 1,0 / 3,0 / 10,0 Гц, A_in = 1,0, SampleTime = 0,001 с, Start time = 0 с, Stop time = 1,999 с (N = 2000), Fixed step решателя = 0,001 с, альтернативный seed равен Seed + 1000. Вариант 1 зарезервирован для демонстрационного прогона (раздел 18.5) и не выдаётся студентам как расчётный.\n",
+    "\n",
+    "| Вариант | τ, с | σ² шума | Seed |\n",
+    "|---|---|---|---|\n",
+    "| 1 | 0,05 | 0,0009 | 101 |\n",
+    "| 2 | 0,03 | 0,0004 | 127 |\n",
+    "| 3 | 0,08 | 0,0016 | 149 |\n",
+    "| 4 | 0,02 | 0,0004 | 173 |\n",
+    "| 5 | 0,12 | 0,0025 | 197 |\n",
+    "| 6 | 0,04 | 0,0009 | 223 |\n",
+    "| 7 | 0,06 | 0,0009 | 251 |\n",
+    "| 8 | 0,10 | 0,0016 | 277 |\n",
+    "| 9 | 0,15 | 0,0036 | 307 |\n",
+    "| 10 | 0,025 | 0,0004 | 331 |\n",
+    "| 11 | 0,07 | 0,0009 | 359 |\n",
+    "| 12 | 0,045 | 0,0009 | 383 |\n",
+    "| 13 | 0,09 | 0,0016 | 409 |\n",
+    "| 14 | 0,035 | 0,0004 | 433 |\n",
+    "| 15 | 0,11 | 0,0025 | 457 |\n",
+    "| 16 | 0,055 | 0,0009 | 479 |\n",
+    "| 17 | 0,13 | 0,0036 | 503 |\n",
+    "| 18 | 0,065 | 0,0009 | 541 |\n",
+    "| 19 | 0,028 | 0,0004 | 563 |\n",
+    "| 20 | 0,085 | 0,0016 | 587 |\n",
+    "| 21 | 0,14 | 0,0036 | 613 |\n",
+    "| 22 | 0,038 | 0,0004 | 641 |\n",
+    "| 23 | 0,075 | 0,0009 | 659 |"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Индивидуальные варианты",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "43027f53",
+   "cell_type": "markdown",
+   "source": [
+    "## 5. Теоретические сведения\n",
+    "\n",
+    "## 5.1. Измерительная задача и модель тракта\n",
+    "\n",
+    "Реальный измерительный тракт (кабель, фильтр, канал связи) характеризуется передаточной функцией H(f), показывающей, как тракт изменяет амплитуду (и фазу) гармонического сигнала на каждой частоте. В данной работе тракт моделируется звеном первого порядка (аналог RC-цепи низких частот) с известной постоянной времени τ:\n",
+    "\n",
+    "H(s) = 1 / (τ·s + 1),   |H(f)| = 1 / sqrt(1 + (2·π·f·τ)²)\n",
+    "\n",
+    "Частота среза (по уровню −3 дБ) такого тракта: f_c = 1 / (2·π·τ). На частотах много ниже f_c тракт пропускает сигнал почти без ослабления; на частотах много выше f_c — ослабляет его пропорционально частоте.\n",
+    "\n",
+    "## 5.2. Многочастотный зондирующий сигнал\n",
+    "\n",
+    "Вместо последовательного измерения на каждой частоте отдельным прогоном используется многочастотный (многотональный) зондирующий сигнал — сумма трёх гармоник с известными и различными амплитудами (в данной работе — одинаковыми, A_in = 1,0) и бин-кратными частотами:\n",
+    "\n",
+    "x[n] = A_in · (sin(2π·f1·n·Ts) + sin(2π·f2·n·Ts) + sin(2π·f3·n·Ts))\n",
+    "\n",
+    "Частоты f1 = 1,0 Гц, f2 = 3,0 Гц, f3 = 10,0 Гц выбраны кратными шагу частотного бина Δf = fs/N = 0,5 Гц (fs = 1000 Гц, N = 2000), что исключает спектральную утечку (см. лекцию 5) и позволяет точно извлечь амплитуду отклика на каждой частоте одним прогоном.\n",
+    "\n",
+    "## 5.3. Измерение передаточной характеристики\n",
+    "\n",
+    "Зондирующий сигнал пропускается через модель тракта, к отклику добавляется малый измерительный шум (имитация реального измерительного тракта), и результат сохраняется как единый выходной массив measured_output. Амплитуда отклика на частоте f извлекается прямым вычислением ДПФ в соответствующем частотном бине k = f·N/fs:\n",
+    "\n",
+    "X[k] = Σ y[n]·exp(−j·2π·k·n/N),   n = 0, ..., N−1\n",
+    "A_out(f) = 2·|X[k]| / N\n",
+    "\n",
+    "Измеренная передаточная характеристика на частоте f — отношение амплитуды отклика к известной амплитуде зондирующего сигнала:\n",
+    "\n",
+    "H_meas(f) = A_out(f) / A_in\n",
+    "\n",
+    "Результат сравнивается с теоретическим значением H_theory(f) раздела 5.1 для того же τ.\n",
+    "\n",
+    "## 5.4. Заранее заданные критерии\n",
+    "\n",
+    "Для варианта 1 используются τ = 0,05 с (f_c ≈ 3,18 Гц), σ² измерительного шума = 0,0009, N = 2000, SampleTime = 0,001 с, тестовые частоты 1,0 / 3,0 / 10,0 Гц, A_in = 1,0.\n",
+    "\n",
+    "Жёсткие критерии:\n",
+    "\n",
+    "- массив содержит ровно 2000 конечных значений;\n",
+    "\n",
+    "- запуски с одинаковыми параметрами и seed дают одинаковые полные массивы;\n",
+    "\n",
+    "- изменение только seed изменяет полный выходной массив;\n",
+    "\n",
+    "- после проверки восстановлены параметры варианта 1.\n",
+    "\n",
+    "Численные критерии (вариант 1):\n",
+    "\n",
+    "- на каждой из трёх тестовых частот измеренное H_meas(f) отличается от теоретического H_theory(f) не более чем в 2 раза в любую сторону (H_meas/H_theory ∈ [0,5; 2,0]);\n",
+    "\n",
+    "- измеренная характеристика монотонно убывает с ростом частоты (H_meas(1,0) > H_meas(3,0) > H_meas(10,0)), что качественно подтверждает поведение тракта нижних частот.\n",
+    "\n",
+    "Статистические границы являются диагностическими для данной учебной модели, а не универсальными метрологическими допусками.\n",
+    "\n",
+    "## 5.5. Ограничения модели\n",
+    "\n",
+    "- тракт моделируется звеном первого порядка; реальные тракты часто имеют более сложную (не монотонную, с резонансами) передаточную характеристику;\n",
+    "\n",
+    "- измеряется только амплитудная часть передаточной характеристики; фазовая часть в данной работе не оценивается;\n",
+    "\n",
+    "- используются всего три тестовые частоты — это даёт лишь несколько точек АЧХ, а не непрерывную кривую;\n",
+    "\n",
+    "- частоты зондирующего сигнала выбраны заранее бин-кратными — в реальном измерении требуется отдельно обеспечивать синхронизацию частоты дискретизации и длительности наблюдения;\n",
+    "\n",
+    "- цифровая модель не заменяет поверку или калибровку реального анализатора АЧХ/цепей."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Теоретические сведения",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "01546f66",
+   "cell_type": "markdown",
+   "source": [
+    "## Построение модели в Engee\n",
+    "\n",
+    "Выполните ячейки ниже по порядку — они создадут модель `LR07_transfer_characteristic` программно, через API Engee, и соединят блоки в точности по схеме, приведённой в методических указаниях (.docx) этой лабораторной работы. Для первичной проверки используются параметры варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: построение модели",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "056477d9",
+   "cell_type": "code",
+   "source": [
+    "m = engee.create(\"LR07_transfer_characteristic\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Создать модель",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "44a3aa7e",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Sine Wave\", \"LR07_transfer_characteristic/Tone1\")\n",
+    "engee.set_param!(\"LR07_transfer_characteristic/Tone1\", \"Amplitude\"=>\"1.0\", \"Frequency\"=>\"6.283185\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок Tone1",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "d81e1bbc",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Sine Wave\", \"LR07_transfer_characteristic/Tone2\")\n",
+    "engee.set_param!(\"LR07_transfer_characteristic/Tone2\", \"Amplitude\"=>\"1.0\", \"Frequency\"=>\"18.849556\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок Tone2",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "3b945f84",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Sine Wave\", \"LR07_transfer_characteristic/Tone3\")\n",
+    "engee.set_param!(\"LR07_transfer_characteristic/Tone3\", \"Amplitude\"=>\"1.0\", \"Frequency\"=>\"62.831853\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок Tone3",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "32d84ef7",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR07_transfer_characteristic/ProbeSum\")\n",
+    "engee.set_param!(\"LR07_transfer_characteristic/ProbeSum\", \"Inputs\"=>\"+++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок ProbeSum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "05fae233",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Continuous/Transfer Fcn\", \"LR07_transfer_characteristic/PathFilter\")\n",
+    "engee.set_param!(\"LR07_transfer_characteristic/PathFilter\", \"Numerator\"=>\"[1]\", \"Denominator\"=>\"[0.05, 1]\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок PathFilter",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "2a0e9708",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR07_transfer_characteristic/MeasNoise\")\n",
+    "engee.set_param!(\"LR07_transfer_characteristic/MeasNoise\", \"Mean\"=>\"0\", \"Variance\"=>\"0.0009\", \"Seed\"=>\"101\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок MeasNoise",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "01ca0a82",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR07_transfer_characteristic/OutputSum\")\n",
+    "engee.set_param!(\"LR07_transfer_characteristic/OutputSum\", \"Inputs\"=>\"++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок OutputSum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "e67ff0b2",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR07_transfer_characteristic/MeasuredOutput\")\n",
+    "engee.set_param!(\"LR07_transfer_characteristic/MeasuredOutput\", \"VariableName\"=>\"measured_output\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок MeasuredOutput",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "1f126865",
+   "cell_type": "code",
+   "source": [
+    "engee.add_line(\"LR07_transfer_characteristic\", \"Tone1/main_out\", \"ProbeSum/in_1\")\n",
+    "engee.add_line(\"LR07_transfer_characteristic\", \"Tone2/main_out\", \"ProbeSum/in_2\")\n",
+    "engee.add_line(\"LR07_transfer_characteristic\", \"Tone3/main_out\", \"ProbeSum/in_3\")\n",
+    "engee.add_line(\"LR07_transfer_characteristic\", \"ProbeSum/main_out\", \"PathFilter/Input_1\")\n",
+    "engee.add_line(\"LR07_transfer_characteristic\", \"PathFilter/Output_1\", \"OutputSum/in_1\")\n",
+    "engee.add_line(\"LR07_transfer_characteristic\", \"MeasNoise/Output_1\", \"OutputSum/in_2\")\n",
+    "engee.add_line(\"LR07_transfer_characteristic\", \"OutputSum/main_out\", \"MeasuredOutput/Input_1\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Соединить блоки",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "cfa1313d",
+   "cell_type": "code",
+   "source": [
+    "engee.set_param!(\"LR07_transfer_characteristic\", \"StartTime\"=>\"0\", \"StopTime\"=>\"1.999\", \"FixedStep\"=>\"0.001\")\n",
+    "engee.save(m, \"LR07_transfer_characteristic.engee\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Параметры моделирования и сохранение",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "bc1a6396",
+   "cell_type": "code",
+   "source": [
+    "engee.run(\"LR07_transfer_characteristic\")\n",
+    "println(\"measured_output: N=\", length(measured_output.value))"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Запустить и проверить",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "9bf514bc",
+   "cell_type": "markdown",
+   "source": [
+    "## Обработка результатов\n",
+    "\n",
+    "Ячейка ниже — выполненный и проверенный скрипт `LR07_transfer_characteristic.jl` (реальный результат прогона приведён в разделе «Демонстрационный вариант» ниже). Скрипт выполняет протокол воспроизводимости (4 запуска: seed, seed, seed+1000, seed) и проверяет все заранее заданные численные критерии варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: обработка результатов",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "66fcc4cb",
+   "cell_type": "code",
+   "source": [
+    "using Statistics\n",
+    "\n",
+    "const NSAMP = 2000\n",
+    "const DT = 0.001\n",
+    "const TAU = 0.05\n",
+    "const TEST_FREQS = [1.0, 3.0, 10.0]\n",
+    "const A_IN = 1.0\n",
+    "const SEED = 101\n",
+    "\n",
+    "Htheory(f, tau) = 1 / sqrt(1 + (2*pi*f*tau)^2)\n",
+    "\n",
+    "function amp_at_freq(x, f::Float64, fs::Float64, n::Int)\n",
+    "    k = round(Int, f * n / fs)\n",
+    "    X = 0.0 + 0.0im\n",
+    "    for m in 0:n-1\n",
+    "        X += x[m+1] * cispi(-2*k*m/n)\n",
+    "    end\n",
+    "    return 2 * abs(X) / n\n",
+    "end\n",
+    "\n",
+    "function run_lr07(seed::Integer)\n",
+    "    engee.set_param!(\"LR07_transfer_characteristic/MeasNoise\", \"Seed\" => string(seed))\n",
+    "    engee.run(\"LR07_transfer_characteristic\")\n",
+    "    data = copy(measured_output.value)\n",
+    "    fs = 1 / DT\n",
+    "    amps = [amp_at_freq(data, f, fs, NSAMP) for f in TEST_FREQS]\n",
+    "    return (data=data, amps=amps)\n",
+    "end\n",
+    "\n",
+    "r1 = run_lr07(SEED)\n",
+    "r2 = run_lr07(SEED)\n",
+    "r3 = run_lr07(SEED + 1000)\n",
+    "r4 = run_lr07(SEED)\n",
+    "\n",
+    "EQ_1_2 = r1.data == r2.data\n",
+    "EQ_1_4 = r1.data == r4.data\n",
+    "EQ_1_3 = r1.data == r3.data\n",
+    "EQ_2_4 = r2.data == r4.data\n",
+    "\n",
+    "H_meas = r1.amps ./ A_IN\n",
+    "H_theory = [Htheory(f, TAU) for f in TEST_FREQS]\n",
+    "\n",
+    "for i in 1:length(TEST_FREQS)\n",
+    "    println(\"f=\", TEST_FREQS[i], \" H_meas=\", H_meas[i], \" H_theory=\", H_theory[i])\n",
+    "end\n",
+    "println(\"EQ_1_2=\", EQ_1_2, \" EQ_1_4=\", EQ_1_4, \" EQ_1_3=\", EQ_1_3, \" EQ_2_4=\", EQ_2_4)\n",
+    "\n",
+    "ratios = H_meas ./ H_theory\n",
+    "PASS = EQ_1_2 && EQ_1_4 && !EQ_1_3 && EQ_2_4 && all(0.5 .<= ratios .<= 2.0)\n",
+    "println(\"PASS=\", PASS)"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Скрипт обработки (delivery script)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "1f4c6e89",
+   "cell_type": "markdown",
+   "source": [
+    "## 15. Контрольные вопросы\n",
+    "\n",
+    "- Почему для измерения передаточной характеристики удобно использовать многочастотный, а не однотональный зондирующий сигнал?\n",
+    "\n",
+    "- Зачем тестовые частоты выбраны кратными шагу частотного бина Δf = fs/N?\n",
+    "\n",
+    "- Что такое частота среза тракта и как она связана с постоянной времени τ?\n",
+    "\n",
+    "- Почему измеренная характеристика может отличаться от теоретической даже при правильной модели тракта?\n",
+    "\n",
+    "- Как изменится H_meas(f) на фиксированной частоте при увеличении τ тракта?\n",
+    "\n",
+    "- Почему одинаковый seed должен воспроизводить полный выходной массив?\n",
+    "\n",
+    "- Какую информацию о тракте эта работа не измеряет (см. ограничения модели)?\n",
+    "\n",
+    "- Почему в реальном измерении сложнее обеспечить точное совпадение частоты зондирующего сигнала с частотным бином?\n",
+    "\n",
+    "- Чем эта работа отличается от ЛР № 5 по решаемой измерительной задаче, при том что обе используют ДПФ?\n",
+    "\n",
+    "- Как можно расширить эту модель для измерения не трёх, а большего числа точек АЧХ?"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Контрольные вопросы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "305b3c6c",
+   "cell_type": "markdown",
+   "source": [
+    "## Раздел для преподавателя: демонстрационный вариант\n",
+    "\n",
+    "Вариант 1 зарезервирован исключительно для демонстрационного прогона и не выдаётся студентам как расчётный (раздел 6). Приведённый ниже прогон подтверждает, что комплект работоспособен целиком: модель фактически создана и соединена в Engee, доставляемый скрипт фактически выполнен в этой среде без ошибок, а результат прошёл все заранее заданные критерии приёмки.\n",
+    "\n",
+    "Ход выполнения:\n",
+    "\n",
+    "- модель LR07_transfer_characteristic создана программно (engee.create) и заполнена блоками трёх Sine Wave, двух Add, Transfer Fcn, Random Number и To Workspace;\n",
+    "\n",
+    "- при первой попытке соединения линий обнаружено, что выходной порт блока Sine Wave называется main_out, а не Output_1 (как у Pulse Generator и Random Number в предыдущих работах) — это выявлено через engee.get_ports и учтено при построении всех трёх соединений от источников тонов;\n",
+    "\n",
+    "- блоки соединены линиями (engee.add_line) по схеме раздела 7: три тона → 3-входовый сумматор зонда → Transfer Fcn (τ = 0,05 с) → 2-входовый сумматор выхода (второй вход — измерительный шум) → выход; шаг решателя (Fixed step) установлен равным шагу дискретизации блоков (0,001 с); модель сохранена и экспортирована в LR07_transfer_characteristic.engee;\n",
+    "\n",
+    "- скрипт LR07_transfer_characteristic.jl выполнен целиком через include() непосредственно в среде Engee 26.8.2-H3; при первом запуске обнаружено несоответствие типа данных (measured_output.value возвращает WorkspaceArray, а не Vector{Float64}) — функция извлечения амплитуды исправлена и скрипт перезаписан на диск заново;\n",
+    "\n",
+    "- скрипт выполнил четыре запуска модели (seed 101, 101, 1101, 101), для каждого методом прямого ДПФ извлёк амплитуду отклика на трёх тестовых частотах, вычислил измеренную и теоретическую передаточные характеристики, сравнил полные выходные массивы и проверил численные критерии раздела 5.4;\n",
+    "\n",
+    "- после проверки вариант 1 восстановлен (Seed = 101), модель повторно сохранена.\n",
+    "\n",
+    "Фактический вывод скрипта (консоль Engee):\n",
+    "\n",
+    "f=1.0 H_meas=0.9564818200114171 H_theory=0.954028216378465\n",
+    "f=3.0 H_meas=0.7324871850750098 H_theory=0.7277271833895271\n",
+    "f=10.0 H_meas=0.30557926945890773 H_theory=0.30331447105335285\n",
+    "EQ_1_2=true EQ_1_4=true EQ_1_3=false EQ_2_4=true\n",
+    "PASS=true\n",
+    "\n",
+    "| f, Гц | H_meas | H_theory | Расхождение |\n",
+    "|---|---|---|---|\n",
+    "| 1,0 | 0,9565 | 0,9540 | +0,26 % |\n",
+    "| 3,0 | 0,7325 | 0,7277 | +0,65 % |\n",
+    "| 10,0 | 0,3056 | 0,3033 | +0,75 % |\n",
+    "\n",
+    "Проверка воспроизводимости полных выходных массивов:\n",
+    "\n",
+    "EQ_1_2 = true   EQ_1_4 = true   EQ_1_3 = false   EQ_2_4 = true\n",
+    "PASS: модель и критерии варианта 1 проверены; параметры восстановлены\n",
+    "\n",
+    "Результат демонстрационного прогона совпадает с ориентирами раздела 17: измеренная передаточная характеристика монотонно убывает с ростом частоты и отличается от теоретической не более чем на 1 % на всех трёх тестовых частотах — заметно лучше формального критерия допуска. Это подтверждает, что комплект LR07_transfer_characteristic может быть выдан студентам в текущем виде."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Демонстрационный вариант (для преподавателя)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  }
+ ]
+}

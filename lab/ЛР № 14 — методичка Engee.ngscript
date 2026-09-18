@@ -1,0 +1,685 @@
+{
+ "nbformat": 4,
+ "nbformat_minor": 2,
+ "metadata": {
+  "kernelspec": {
+   "display_name": "IJulia 1.9.3",
+   "language": "julia",
+   "name": "ijulia-1.9"
+  },
+  "language_info": {
+   "file_extension": ".jl",
+   "mimetype": "application/julia",
+   "name": "julia",
+   "version": "1.9.3"
+  },
+  "engee": {}
+ },
+ "cells": [
+  {
+   "id": "703754cb",
+   "cell_type": "markdown",
+   "source": [
+    "# Лабораторная работа № 14\n",
+    "\n",
+    "*Моделирование baseline и выявление отклонений от нормы в Engee*\n",
+    "\n",
+    "- Пороговое обнаружение аномалий: правило трёх сигм, чувствительность и ложные срабатывания\n",
+    "- Дисциплина: «Измерения в телекоммуникационных системах»\n",
+    "- Специальность: 10.05.02 «Информационная безопасность телекоммуникационных систем»\n",
+    "- Специализация: № 9 «Управление безопасностью телекоммуникационных систем и сетей»\n",
+    "- Формат: модельный измерительный эксперимент в Engee\n",
+    "- Продолжительность: 2 академических часа\n",
+    "- Форма работы: индивидуальная работа на учебной платформе Engee\n",
+    "- Контроль: отчёт, модель LR14_baseline_deviation.engee, выполненный скрипт LR14_baseline_deviation.jl, устная защита"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Титул",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "a63980fb",
+   "cell_type": "markdown",
+   "source": [
+    "## 1. Цель работы\n",
+    "\n",
+    "Освоить принцип порогового обнаружения отклонений измеряемого показателя от базового уровня (baseline): смоделировать показатель с baseline-поведением, случайным шумом и внезапной ступенчатой аномалией, оценить baseline и порог обнаружения по обучающему участку записи, применить пороговое правило «три сигмы» и количественно оценить его чувствительность (долю верно обнаруженных отклонений) и долю ложных срабатываний."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Цель работы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "b75a6c89",
+   "cell_type": "markdown",
+   "source": [
+    "## 6. Индивидуальные варианты\n",
+    "\n",
+    "Номер варианта назначает преподаватель. Во всех вариантах: k = 3, N = 2000, SampleTime = 0,01 с, Start time = 0 с, Stop time = 19,99 с, Fixed step решателя = 0,01 с, обучающий участок — первая половина записи (первые 1000 отсчётов), альтернативный seed равен Seed + 1000. Вариант 1 зарезервирован для демонстрационного прогона (раздел 18.5) и не выдаётся студентам как расчётный.\n",
+    "\n",
+    "| Вариант | D0 | σ² | ΔA | t_a, с | Seed |\n",
+    "|---|---|---|---|---|---|\n",
+    "| 1 | 20 | 4 | 10 | 10 | 101 |\n",
+    "| 2 | 15 | 2 | 8 | 11 | 127 |\n",
+    "| 3 | 25 | 9 | 15 | 12 | 149 |\n",
+    "| 4 | 10 | 1 | 6 | 10 | 173 |\n",
+    "| 5 | 30 | 16 | 20 | 13 | 197 |\n",
+    "| 6 | 18 | 4 | 9 | 10 | 223 |\n",
+    "| 7 | 22 | 6 | 12 | 14 | 251 |\n",
+    "| 8 | 12 | 2 | 7 | 11 | 277 |\n",
+    "| 9 | 28 | 12 | 18 | 12 | 307 |\n",
+    "| 10 | 16 | 4 | 10 | 10 | 331 |\n",
+    "| 11 | 24 | 5 | 11 | 13 | 359 |\n",
+    "| 12 | 14 | 2 | 8 | 11 | 383 |\n",
+    "| 13 | 26 | 9 | 16 | 15 | 409 |\n",
+    "| 14 | 20 | 3 | 9 | 10 | 433 |\n",
+    "| 15 | 17 | 7 | 13 | 12 | 457 |\n",
+    "| 16 | 23 | 4 | 10 | 11 | 479 |\n",
+    "| 17 | 11 | 16 | 22 | 14 | 503 |\n",
+    "| 18 | 29 | 5 | 12 | 10 | 541 |\n",
+    "| 19 | 19 | 1 | 6 | 13 | 563 |\n",
+    "| 20 | 21 | 12 | 19 | 12 | 587 |\n",
+    "| 21 | 13 | 3 | 8 | 10 | 613 |\n",
+    "| 22 | 27 | 6 | 13 | 11 | 641 |\n",
+    "| 23 | 15 | 4 | 10 | 15 | 659 |"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Индивидуальные варианты",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "013448ac",
+   "cell_type": "markdown",
+   "source": [
+    "## 5. Теоретические сведения\n",
+    "\n",
+    "## 5.1. Baseline и обнаружение отклонений по порогу\n",
+    "\n",
+    "Baseline — статистически устойчивое поведение измеряемого показателя в отсутствие аномальных событий, характеризуемое средним значением и разбросом (стандартным отклонением). Пороговое обнаружение отклонений состоит в том, чтобы оценить эти две величины по заведомо безаномальному (обучающему) участку записи, а затем сравнивать все последующие отсчёты с порогом, построенным на основе baseline — характерный приём измерительного и защитного мониторинга (лекция 14).\n",
+    "\n",
+    "## 5.2. Модель показателя со ступенчатой аномалией\n",
+    "\n",
+    "В данной работе измеряемый показатель моделируется как сумма трёх составляющих: базового уровня, случайного шума и ступенчатой аномалии, наступающей в известный момент времени и сохраняющейся до конца записи:\n",
+    "\n",
+    "metric[k] = D0 + w[k] + step[k],   w[k] ~ N(0, σ²)\n",
+    "step[k] = 0,   t_k < t_a\n",
+    "step[k] = ΔA,  t_k ≥ t_a\n",
+    "\n",
+    "где ΔA — величина ступенчатой аномалии, t_a — момент её начала. Первая половина записи (t < t_a) используется как обучающий участок для оценки baseline.\n",
+    "\n",
+    "## 5.3. Пороговое правило «три сигмы» и его характеристики\n",
+    "\n",
+    "Порог обнаружения строится по обучающему участку:\n",
+    "\n",
+    "baseline_mean = mean(metric[1 : TRAIN_N])\n",
+    "baseline_std  = std(metric[1 : TRAIN_N])\n",
+    "threshold = baseline_mean + k·baseline_std,   k = 3\n",
+    "\n",
+    "Отсчёт считается аномальным, если metric[k] > threshold. Качество детектора оценивается долей верно обнаруженных аномальных отсчётов (TPR, true positive rate) относительно фактического периода аномалии и долей ложных срабатываний на безаномальном участке (FPR, false positive rate):\n",
+    "\n",
+    "TPR = (число отсчётов metric>threshold ПРИ t≥t_a) / (число отсчётов с t≥t_a)\n",
+    "FPR = (число отсчётов metric>threshold ПРИ t<t_a) / (число отсчётов с t<t_a)\n",
+    "\n",
+    "При корректно гауссовском шуме и правиле k = 3 теоретическая доля ложных срабатываний на безаномальном участке близка к 0,135 % (площадь хвоста нормального распределения правее +3σ).\n",
+    "\n",
+    "## 5.4. Заранее заданные критерии\n",
+    "\n",
+    "Для варианта 1 используются D0 = 20, σ² = 4 (шум), ΔA = 10 (величина аномалии), t_a = 10 с (момент начала), k = 3, N = 2000, SampleTime = 0,01 с, обучающий участок — первая половина записи (первые 1000 отсчётов, t < 10 с).\n",
+    "\n",
+    "Жёсткие критерии:\n",
+    "\n",
+    "- массив показателя содержит ровно 2000 конечных значений;\n",
+    "\n",
+    "- запуски с одинаковыми параметрами и seed дают одинаковый полный массив показателя;\n",
+    "\n",
+    "- изменение seed изменяет массив показателя (случайная составляющая шума);\n",
+    "\n",
+    "- после проверки восстановлены параметры варианта 1.\n",
+    "\n",
+    "Численные критерии (вариант 1):\n",
+    "\n",
+    "- доля верно обнаруженных аномальных отсчётов TPR превышает 0,9;\n",
+    "\n",
+    "- доля ложных срабатываний FPR не превышает 0,05.\n",
+    "\n",
+    "Статистические границы являются диагностическими для данной учебной модели, а не универсальными метрологическими допусками.\n",
+    "\n",
+    "## 5.5. Ограничения модели\n",
+    "\n",
+    "- в данной модели рассматривается единственная ступенчатая аномалия постоянной величины; реальные отклонения могут быть кратковременными, нарастающими или колебательными;\n",
+    "\n",
+    "- обучающий участок в модели заведомо безаномален; в реальном мониторинге граница обучающего интервала и его чистота от прошлых аномалий требуют отдельного контроля;\n",
+    "\n",
+    "- пороговое правило «три сигмы» предполагает приближённо гауссовское распределение шума baseline; при существенно негауссовском шуме характеристики детектора (TPR, FPR) могут заметно отличаться от теоретических;\n",
+    "\n",
+    "- рассматривается единственный порог k = 3; на практике выбор k — компромисс между чувствительностью и частотой ложных срабатываний, зависящий от стоимости пропуска и ложной тревоги;\n",
+    "\n",
+    "- цифровая модель не заменяет реальный анализ телеметрии эксплуатируемой системы."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Теоретические сведения",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "b7d5fcc0",
+   "cell_type": "markdown",
+   "source": [
+    "## Построение модели в Engee\n",
+    "\n",
+    "Выполните ячейки ниже по порядку — они создадут модель `LR14_baseline_deviation` программно, через API Engee, и соединят блоки в точности по схеме, приведённой в методических указаниях (.docx) этой лабораторной работы. Для первичной проверки используются параметры варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: построение модели",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "1273bdcc",
+   "cell_type": "code",
+   "source": [
+    "m = engee.create(\"LR14_baseline_deviation\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Создать модель",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "316ce42f",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Step\", \"LR14_baseline_deviation/AnomalyStep\")\n",
+    "engee.set_param!(\"LR14_baseline_deviation/AnomalyStep\", \"Before\"=>\"0\", \"After\"=>\"10\", \"Time\"=>\"10\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок AnomalyStep",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "3d457ca2",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Constant\", \"LR14_baseline_deviation/BaselineLevel\")\n",
+    "engee.set_param!(\"LR14_baseline_deviation/BaselineLevel\", \"Value\"=>\"20\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок BaselineLevel",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "c884bc0c",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR14_baseline_deviation/Jitter\")\n",
+    "engee.set_param!(\"LR14_baseline_deviation/Jitter\", \"Mean\"=>\"0\", \"Variance\"=>\"4\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок Jitter",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "07cf91b0",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR14_baseline_deviation/MetricSum\")\n",
+    "engee.set_param!(\"LR14_baseline_deviation/MetricSum\", \"Inputs\"=>\"+++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок MetricSum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "f0b2f22b",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR14_baseline_deviation/MetricOutput\")\n",
+    "engee.set_param!(\"LR14_baseline_deviation/MetricOutput\", \"VariableName\"=>\"metric_value\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок MetricOutput",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "ec4f8154",
+   "cell_type": "code",
+   "source": [
+    "engee.add_line(\"LR14_baseline_deviation\", \"BaselineLevel/Output_1\", \"MetricSum/in_1\")\n",
+    "engee.add_line(\"LR14_baseline_deviation\", \"Jitter/Output_1\", \"MetricSum/in_2\")\n",
+    "engee.add_line(\"LR14_baseline_deviation\", \"AnomalyStep/Output_1\", \"MetricSum/in_3\")\n",
+    "engee.add_line(\"LR14_baseline_deviation\", \"MetricSum/main_out\", \"MetricOutput/Input_1\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Соединить блоки",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "7abb9f61",
+   "cell_type": "code",
+   "source": [
+    "engee.set_param!(\"LR14_baseline_deviation\", \"StartTime\"=>\"0\", \"StopTime\"=>\"19.99\", \"FixedStep\"=>\"0.01\")\n",
+    "engee.save(m, \"LR14_baseline_deviation.engee\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Параметры моделирования и сохранение",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "9130c493",
+   "cell_type": "code",
+   "source": [
+    "engee.run(\"LR14_baseline_deviation\")\n",
+    "println(\"metric_value: N=\", length(metric_value.value))"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Запустить и проверить",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "23e0354d",
+   "cell_type": "markdown",
+   "source": [
+    "## Обработка результатов\n",
+    "\n",
+    "Ячейка ниже — выполненный и проверенный скрипт `LR14_baseline_deviation.jl` (реальный результат прогона приведён в разделе «Демонстрационный вариант» ниже). Скрипт выполняет протокол воспроизводимости (4 запуска: seed, seed, seed+1000, seed) и проверяет все заранее заданные численные критерии варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: обработка результатов",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "53857794",
+   "cell_type": "code",
+   "source": [
+    "using Statistics\n",
+    "\n",
+    "const NSAMP = 2000\n",
+    "const TRAIN_N = 1000\n",
+    "const ANOMALY_START = 10.0\n",
+    "const DT = 0.01\n",
+    "const K_SIGMA = 3.0\n",
+    "const SEED = 101\n",
+    "\n",
+    "function run_lr14(seed::Integer)\n",
+    "    engee.set_param!(\"LR14_baseline_deviation/Jitter\", \"Seed\" => string(seed))\n",
+    "    engee.run(\"LR14_baseline_deviation\")\n",
+    "    data = collect(Float64, metric_value.value)\n",
+    "    train = data[1:TRAIN_N]\n",
+    "    baseline_mean = mean(train)\n",
+    "    baseline_std = std(train)\n",
+    "    threshold = baseline_mean + K_SIGMA * baseline_std\n",
+    "    flag = data .> threshold\n",
+    "    is_anomaly_period = [((k-1)*DT) >= ANOMALY_START for k in 1:NSAMP]\n",
+    "    tp = count(flag .& is_anomaly_period)\n",
+    "    fp = count(flag .& .!is_anomaly_period)\n",
+    "    n_anomaly = count(is_anomaly_period)\n",
+    "    n_normal = NSAMP - n_anomaly\n",
+    "    tpr = tp / n_anomaly\n",
+    "    fpr = fp / n_normal\n",
+    "    return (data=data, baseline_mean=baseline_mean, baseline_std=baseline_std, threshold=threshold, tpr=tpr, fpr=fpr)\n",
+    "end\n",
+    "\n",
+    "r1 = run_lr14(SEED)\n",
+    "r2 = run_lr14(SEED)\n",
+    "r3 = run_lr14(SEED + 1000)\n",
+    "r4 = run_lr14(SEED)\n",
+    "\n",
+    "EQ_1_2 = r1.data == r2.data\n",
+    "EQ_1_4 = r1.data == r4.data\n",
+    "EQ_1_3 = r1.data == r3.data\n",
+    "EQ_2_4 = r2.data == r4.data\n",
+    "\n",
+    "println(\"baseline_mean=\", r1.baseline_mean, \" baseline_std=\", r1.baseline_std, \" threshold=\", r1.threshold)\n",
+    "println(\"TPR (detection rate)=\", r1.tpr, \" FPR (false positive rate)=\", r1.fpr)\n",
+    "println(\"EQ_1_2=\", EQ_1_2, \" EQ_1_4=\", EQ_1_4, \" EQ_1_3=\", EQ_1_3, \" EQ_2_4=\", EQ_2_4)\n",
+    "\n",
+    "PASS = EQ_1_2 && EQ_1_4 && !EQ_1_3 && EQ_2_4 && r1.tpr > 0.9 && r1.fpr < 0.05\n",
+    "println(\"PASS=\", PASS)"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Скрипт обработки (delivery script)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "fda63a49",
+   "cell_type": "markdown",
+   "source": [
+    "## 15. Контрольные вопросы\n",
+    "\n",
+    "- Что такое baseline измеряемого показателя и по какому участку записи он оценивается в данной модели?\n",
+    "\n",
+    "- Почему обучающий участок для оценки baseline должен быть заведомо безаномальным?\n",
+    "\n",
+    "- Как строится порог обнаружения по правилу «три сигмы» и какова его теоретическая доля ложных срабатываний при гауссовском шуме?\n",
+    "\n",
+    "- Что показывают величины TPR и FPR порогового детектора и как они вычисляются в данной модели?\n",
+    "\n",
+    "- Как изменится TPR при увеличении отношения ΔA/σ и почему?\n",
+    "\n",
+    "- Почему увеличение ΔA при неизменном σ не должно заметно менять FPR?\n",
+    "\n",
+    "- Почему одинаковый seed должен воспроизводить полный массив показателя?\n",
+    "\n",
+    "- Какие ограничения правила «три сигмы» проявляются при существенно негауссовском шуме?\n",
+    "\n",
+    "- Как выбор порогового коэффициента k влияет на компромисс между чувствительностью детектора и частотой ложных срабатываний?\n",
+    "\n",
+    "- Как можно было бы расширить модель для обнаружения кратковременной (импульсной), а не устойчивой ступенчатой аномалии?"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Контрольные вопросы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "a53973c0",
+   "cell_type": "markdown",
+   "source": [
+    "## Раздел для преподавателя: демонстрационный вариант\n",
+    "\n",
+    "Вариант 1 зарезервирован исключительно для демонстрационного прогона и не выдаётся студентам как расчётный (раздел 6). Приведённый ниже прогон подтверждает, что комплект работоспособен целиком: модель фактически создана и соединена в Engee, доставляемый скрипт фактически выполнен в этой среде без ошибок, а результат прошёл все заранее заданные критерии приёмки.\n",
+    "\n",
+    "Ход выполнения:\n",
+    "\n",
+    "- модель LR14_baseline_deviation создана программно (engee.create) и заполнена блоками Constant (базовый уровень), Random Number (шум), Step (ступенчатая аномалия, Before=0, After=10, Time=10), Add (3 входа) и To Workspace;\n",
+    "\n",
+    "- блоки соединены линиями (engee.add_line): базовый уровень, шум и аномалия поданы на входы сумматора, выход сумматора — на блок To Workspace с переменной metric_value; шаг решателя (Fixed step) установлен равным шагу дискретизации блоков (0,01 с); модель сохранена и экспортирована в LR14_baseline_deviation.engee;\n",
+    "\n",
+    "- скрипт LR14_baseline_deviation.jl выполнен целиком через include() непосредственно в среде Engee 26.8.2-H3 без ошибок;\n",
+    "\n",
+    "- скрипт выполнил четыре запуска модели (seed 101, 101, 1101, 101); для каждого запуска по первым 1000 отсчётам (обучающий участок, t < 10 с) вычислены baseline_mean и baseline_std, построен порог threshold = baseline_mean + 3·baseline_std, вычислены TPR и FPR относительно фактического периода аномалии (t ≥ 10 с), сравнены полные массивы показателя и проверены численные критерии раздела 5.4;\n",
+    "\n",
+    "- в ходе сессии произошёл сбой ввода в терминале Engee (полная потеря отклика на вводимые команды) — устранён перезагрузкой страницы; сессия ядра Julia сохранилась после перезагрузки, модель повторно найдена через engee.get_all_models() по идентификатору без потери проделанной работы;\n",
+    "\n",
+    "- после проверки вариант 1 восстановлен (Seed = 101), модель повторно сохранена.\n",
+    "\n",
+    "Фактический вывод скрипта (консоль Engee):\n",
+    "\n",
+    "baseline_mean=20.088247791102432 baseline_std=2.0021024860222068 threshold=26.094555249169055\n",
+    "TPR (detection rate)=0.967 FPR (false positive rate)=0.001\n",
+    "EQ_1_2=true EQ_1_4=true EQ_1_3=false EQ_2_4=true\n",
+    "PASS=true\n",
+    "\n",
+    "| Величина | Значение |\n",
+    "|---|---|\n",
+    "| N | 2000 |\n",
+    "| baseline_mean | 20,088 |\n",
+    "| baseline_std | 2,002 |\n",
+    "| threshold | 26,095 |\n",
+    "| TPR | 0,967 |\n",
+    "| FPR | 0,001 |\n",
+    "\n",
+    "Проверка воспроизводимости:\n",
+    "\n",
+    "EQ_1_2=true   (запуски 1 и 2, одинаковый seed 101 — совпадают)\n",
+    "EQ_1_4=true   (запуски 1 и 4, одинаковый seed 101 — совпадают)\n",
+    "EQ_1_3=false  (запуск 3, seed 1101 — отличается, как и требуется)\n",
+    "EQ_2_4=true   (запуски 2 и 4, одинаковый seed 101 — совпадают)\n",
+    "PASS: модель и критерии варианта 1 проверены; параметры восстановлены\n",
+    "\n",
+    "Результат демонстрационного прогона наглядно иллюстрирует принцип порогового обнаружения отклонений по правилу трёх сигм (лекция 14): при оценке baseline исключительно по безаномальному обучающему участку порог надёжно отделяет период аномалии (TPR ≈ 0,97) при пренебрежимо малой доле ложных срабатываний (FPR ≈ 0,001, близко к теоретическому значению 0,00135). Это подтверждает, что комплект LR14_baseline_deviation может быть выдан студентам в текущем виде."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Демонстрационный вариант (для преподавателя)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  }
+ ]
+}

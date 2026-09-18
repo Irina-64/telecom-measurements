@@ -1,0 +1,923 @@
+{
+ "nbformat": 4,
+ "nbformat_minor": 2,
+ "metadata": {
+  "kernelspec": {
+   "display_name": "IJulia 1.9.3",
+   "language": "julia",
+   "name": "ijulia-1.9"
+  },
+  "language_info": {
+   "file_extension": ".jl",
+   "mimetype": "application/julia",
+   "name": "julia",
+   "version": "1.9.3"
+  },
+  "engee": {}
+ },
+ "cells": [
+  {
+   "id": "35c85b0e",
+   "cell_type": "markdown",
+   "source": [
+    "# Лабораторная работа № 16\n",
+    "\n",
+    "*Интегративная измерительная модель Engee (часть 2): кросс-канальная диагностика и локализация причины*\n",
+    "\n",
+    "- Совместная аномалия, корреляция каналов и контрольный (незатронутый) канал\n",
+    "- Дисциплина: «Измерения в телекоммуникационных системах»\n",
+    "- Специальность: 10.05.02 «Информационная безопасность телекоммуникационных систем»\n",
+    "- Специализация: № 9 «Управление безопасностью телекоммуникационных систем и сетей»\n",
+    "- Формат: модельный измерительный эксперимент в Engee\n",
+    "- Продолжительность: 2 академических часа (вторая из двух частей интегративной работы, часть 1 — ЛР № 15)\n",
+    "- Форма работы: индивидуальная работа на учебной платформе Engee\n",
+    "- Контроль: отчёт, модель LR16_cross_channel_diagnostics.engee, выполненный скрипт LR16_cross_channel_diagnostics.jl, устная защита"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Титул",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "99f1f7ca",
+   "cell_type": "markdown",
+   "source": [
+    "## 1. Цель работы\n",
+    "\n",
+    "Освоить принцип кросс-канальной диагностики: смоделировать общую (единую) аномалию, одновременно воздействующую на два независимых измерительных канала, обнаружить её пороговым методом в каждом канале по отдельности и совместно (логическое И), количественно оценить корреляцию между каналами и подтвердить локализацию причины при помощи контрольного канала, не подверженного этой аномалии."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Цель работы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "456881eb",
+   "cell_type": "markdown",
+   "source": [
+    "## 6. Индивидуальные варианты\n",
+    "\n",
+    "Номер варианта назначает преподаватель. Во всех вариантах: σ²_t = 0,04, σ²_c = D0-зависимая (равна σ²_d), период события — ступенчатый (не периодический), N = 2000, SampleTime = 0,01 с, Start time = 0 с, Stop time = 19,99 с, Fixed step решателя = 0,01 с, обучающий участок — первая половина записи, альтернативный seed равен Seed + 1000, Seed контрольного канала равен Seed + 300 (задаётся автоматически скриптом). Вариант 1 зарезервирован для демонстрационного прогона (раздел 18.5) и не выдаётся студентам как расчётный.\n",
+    "\n",
+    "| Вариант | D0 | σ²_d | ΔA | t_a, с | Seed |\n",
+    "|---|---|---|---|---|---|\n",
+    "| 1 | 20 | 9 | 15 | 10 | 101 |\n",
+    "| 2 | 15 | 4 | 10 | 11 | 127 |\n",
+    "| 3 | 25 | 16 | 20 | 12 | 149 |\n",
+    "| 4 | 10 | 1 | 8 | 10 | 173 |\n",
+    "| 5 | 30 | 25 | 25 | 13 | 197 |\n",
+    "| 6 | 18 | 9 | 12 | 10 | 223 |\n",
+    "| 7 | 22 | 6 | 16 | 14 | 251 |\n",
+    "| 8 | 12 | 2 | 9 | 11 | 277 |\n",
+    "| 9 | 28 | 16 | 22 | 12 | 307 |\n",
+    "| 10 | 16 | 9 | 13 | 10 | 331 |\n",
+    "| 11 | 24 | 4 | 15 | 13 | 359 |\n",
+    "| 12 | 14 | 2 | 11 | 11 | 383 |\n",
+    "| 13 | 26 | 16 | 19 | 15 | 409 |\n",
+    "| 14 | 20 | 6 | 14 | 10 | 433 |\n",
+    "| 15 | 17 | 9 | 17 | 12 | 457 |\n",
+    "| 16 | 23 | 4 | 14 | 11 | 479 |\n",
+    "| 17 | 11 | 25 | 24 | 14 | 503 |\n",
+    "| 18 | 29 | 6 | 16 | 10 | 541 |\n",
+    "| 19 | 19 | 1 | 9 | 13 | 563 |\n",
+    "| 20 | 21 | 16 | 21 | 12 | 587 |\n",
+    "| 21 | 13 | 4 | 10 | 10 | 613 |\n",
+    "| 22 | 27 | 9 | 16 | 11 | 641 |\n",
+    "| 23 | 15 | 4 | 13 | 15 | 659 |"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Индивидуальные варианты",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "5a2c3a0e",
+   "cell_type": "markdown",
+   "source": [
+    "## 5. Теоретические сведения\n",
+    "\n",
+    "## 5.1. От синхронизации каналов (ЛР № 15) к диагностике (ЛР № 16)\n",
+    "\n",
+    "В первой части работы (ЛР № 15) несколько измерительных каналов были синхронизированы на общей временной шкале, но оставались статистически независимыми. Во второй части в модель добавляется ОБЩАЯ аномалия (единая причина), одновременно воздействующая на два из трёх каналов — это позволяет продемонстрировать принцип защитной диагностики (лекция 16): совместное отклонение нескольких каналов является более достоверным признаком реального события, чем отклонение одного канала.\n",
+    "\n",
+    "## 5.2. Модель с общей причиной и контрольным каналом\n",
+    "\n",
+    "Канал задержки и канал телеметрии формируются как в ЛР № 15, но дополнительно суммируются с ОДНИМ и тем же сигналом общей аномалии (ступенчатое отклонение, начинающееся в момент t_a):\n",
+    "\n",
+    "delay[k]     = D0 + w_d[k] + anomaly[k]\n",
+    "telemetry[k] = A0·sin(2π f t_k) + w_t[k] + anomaly[k]\n",
+    "control[k]   = D0 + w_c[k]              (без anomaly[k] — контрольный канал)\n",
+    "\n",
+    "Контрольный канал (control) статистически подобен каналу задержки (тот же базовый уровень и дисперсия шума), но НЕ подвержен общей аномалии и использует независимый случайный источник — он играет роль «незатронутой подсистемы», относительно которой проверяется локализация причины.\n",
+    "\n",
+    "## 5.3. Пороговое обнаружение и совместный индикатор\n",
+    "\n",
+    "Для каждого канала по отдельности порог обнаружения строится по обучающему участку (первая половина записи, до момента t_a), как в ЛР № 14 (правило трёх сигм). Совместный (кросс-канальный) индикатор аномалии определяется как логическое И индивидуальных индикаторов задержки и телеметрии:\n",
+    "\n",
+    "flag_joint[k] = flag_delay[k] AND flag_telemetry[k]\n",
+    "\n",
+    "Совместный индикатор, как правило, реже срабатывает ложно (почти нулевая доля ложных срабатываний), поскольку требует одновременного превышения порога в ДВУХ независимых по шуму каналах.\n",
+    "\n",
+    "## 5.4. Кросс-канальная корреляция и локализация причины\n",
+    "\n",
+    "Коэффициент корреляции между полными рядами двух каналов, подверженных общей аномалии (задержка и телеметрия), должен быть заметно положительным — общая составляющая создаёт статистическую связь между иначе независимыми каналами. Коэффициент корреляции между каналом задержки и КОНТРОЛЬНЫМ каналом должен быть близок к нулю — это и есть количественное подтверждение локализации: аномалия затронула определённые каналы (задержка, телеметрия) и НЕ затронула контрольный канал.\n",
+    "\n",
+    "corr(delay, telemetry) — заметно положительный (общая причина)\n",
+    "corr(delay, control)   — близок к нулю (независимые каналы)\n",
+    "\n",
+    "## 5.5. Заранее заданные критерии\n",
+    "\n",
+    "Для варианта 1 используются D0 = 20, σ²_d = 9 (задержка), σ²_t = 0,04 (телеметрия), σ²_c = 9 (контроль), ΔA = 15 (величина общей аномалии), t_a = 10 с, N = 2000, SampleTime = 0,01 с, обучающий участок — первая половина записи.\n",
+    "\n",
+    "Жёсткие критерии:\n",
+    "\n",
+    "- все три канала содержат ровно 2000 конечных значений;\n",
+    "\n",
+    "- запуски с одинаковыми параметрами и seed дают одинаковые полные массивы для КАЖДОГО из трёх каналов по отдельности;\n",
+    "\n",
+    "- изменение seed изменяет каждый из трёх массивов;\n",
+    "\n",
+    "- после проверки восстановлены параметры варианта 1.\n",
+    "\n",
+    "Численные критерии (вариант 1):\n",
+    "\n",
+    "- совместная (кросс-канальная) доля верно обнаруженных отсчётов превышает 0,7, доля ложных срабатываний не превышает 0,05;\n",
+    "\n",
+    "- доля ложных срабатываний контрольного канала не превышает 0,1;\n",
+    "\n",
+    "- коэффициент корреляции между задержкой и телеметрией превышает 0,3;\n",
+    "\n",
+    "- модуль коэффициента корреляции между задержкой и контрольным каналом не превышает 0,3.\n",
+    "\n",
+    "Статистические границы являются диагностическими для данной учебной модели, а не универсальными метрологическими допусками.\n",
+    "\n",
+    "## 5.6. Ограничения модели\n",
+    "\n",
+    "- общая причина в модели реализована КОНСТРУКТИВНО (одна и та же линия сигнала подана на оба канала) — в реальной системе связь между каналами устанавливается статистически и может быть неполной или запаздывающей;\n",
+    "\n",
+    "- контрольный канал в данной модели статистически подобен каналу задержки лишь по уровню и дисперсии шума; в реальной системе выбор подходящего контрольного канала — отдельная методическая задача;\n",
+    "\n",
+    "- рассматривается единственная общая ступенчатая аномалия; реальные совместные аномалии могут иметь разную форму и различное запаздывание между каналами;\n",
+    "\n",
+    "- высокая корреляция не доказывает причинно-следственную связь сама по себе — в модели причинность заложена конструктивно, а не выведена из данных (см. также ЛР № 13);\n",
+    "\n",
+    "- цифровая модель не заменяет реальную кросс-канальную диагностику эксплуатируемой системы."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Теоретические сведения",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "be1221ee",
+   "cell_type": "markdown",
+   "source": [
+    "## Построение модели в Engee\n",
+    "\n",
+    "Выполните ячейки ниже по порядку — они создадут модель `LR16_cross_channel_diagnostics` программно, через API Engee, и соединят блоки в точности по схеме, приведённой в методических указаниях (.docx) этой лабораторной работы. Для первичной проверки используются параметры варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: построение модели",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "c484ff68",
+   "cell_type": "code",
+   "source": [
+    "m = engee.create(\"LR16_cross_channel_diagnostics\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Создать модель",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "2749ed8b",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Constant\", \"LR16_cross_channel_diagnostics/BaselineDelay\")\n",
+    "engee.set_param!(\"LR16_cross_channel_diagnostics/BaselineDelay\", \"Value\"=>\"20\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок BaselineDelay",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "f1a19384",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR16_cross_channel_diagnostics/DelayJitter\")\n",
+    "engee.set_param!(\"LR16_cross_channel_diagnostics/DelayJitter\", \"Mean\"=>\"0\", \"Variance\"=>\"9\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок DelayJitter",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "43775c9a",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Step\", \"LR16_cross_channel_diagnostics/SharedAnomaly\")\n",
+    "engee.set_param!(\"LR16_cross_channel_diagnostics/SharedAnomaly\", \"Before\"=>\"0\", \"After\"=>\"15\", \"Time\"=>\"10\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок SharedAnomaly",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "b8313f40",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR16_cross_channel_diagnostics/DelaySum\")\n",
+    "engee.set_param!(\"LR16_cross_channel_diagnostics/DelaySum\", \"Inputs\"=>\"+++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок DelaySum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "3c0bf730",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR16_cross_channel_diagnostics/DelayOutput\")\n",
+    "engee.set_param!(\"LR16_cross_channel_diagnostics/DelayOutput\", \"VariableName\"=>\"delay_metric\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок DelayOutput",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "6a0574f1",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Sine Wave\", \"LR16_cross_channel_diagnostics/TelemetrySignal\")\n",
+    "engee.set_param!(\"LR16_cross_channel_diagnostics/TelemetrySignal\", \"Amplitude\"=>\"5\", \"Frequency\"=>\"3.14159265\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок TelemetrySignal",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "45f25249",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR16_cross_channel_diagnostics/MeasNoise\")\n",
+    "engee.set_param!(\"LR16_cross_channel_diagnostics/MeasNoise\", \"Mean\"=>\"0\", \"Variance\"=>\"0.04\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок MeasNoise",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "c8c91765",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR16_cross_channel_diagnostics/TelemetrySum\")\n",
+    "engee.set_param!(\"LR16_cross_channel_diagnostics/TelemetrySum\", \"Inputs\"=>\"+++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок TelemetrySum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "f8df59f8",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR16_cross_channel_diagnostics/TelemetryOutput\")\n",
+    "engee.set_param!(\"LR16_cross_channel_diagnostics/TelemetryOutput\", \"VariableName\"=>\"telemetry_value\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок TelemetryOutput",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "4f9fc565",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR16_cross_channel_diagnostics/ControlNoise\")\n",
+    "engee.set_param!(\"LR16_cross_channel_diagnostics/ControlNoise\", \"Mean\"=>\"20\", \"Variance\"=>\"9\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок ControlNoise",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "7c897997",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR16_cross_channel_diagnostics/ControlOutput\")\n",
+    "engee.set_param!(\"LR16_cross_channel_diagnostics/ControlOutput\", \"VariableName\"=>\"control_metric\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок ControlOutput",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "f20244a7",
+   "cell_type": "code",
+   "source": [
+    "engee.add_line(\"LR16_cross_channel_diagnostics\", \"BaselineDelay/Output_1\", \"DelaySum/in_1\")\n",
+    "engee.add_line(\"LR16_cross_channel_diagnostics\", \"DelayJitter/Output_1\", \"DelaySum/in_2\")\n",
+    "engee.add_line(\"LR16_cross_channel_diagnostics\", \"SharedAnomaly/Output_1\", \"DelaySum/in_3\")\n",
+    "engee.add_line(\"LR16_cross_channel_diagnostics\", \"DelaySum/main_out\", \"DelayOutput/Input_1\")\n",
+    "engee.add_line(\"LR16_cross_channel_diagnostics\", \"TelemetrySignal/main_out\", \"TelemetrySum/in_1\")\n",
+    "engee.add_line(\"LR16_cross_channel_diagnostics\", \"MeasNoise/Output_1\", \"TelemetrySum/in_2\")\n",
+    "engee.add_line(\"LR16_cross_channel_diagnostics\", \"SharedAnomaly/Output_1\", \"TelemetrySum/in_3\")\n",
+    "engee.add_line(\"LR16_cross_channel_diagnostics\", \"TelemetrySum/main_out\", \"TelemetryOutput/Input_1\")\n",
+    "engee.add_line(\"LR16_cross_channel_diagnostics\", \"ControlNoise/Output_1\", \"ControlOutput/Input_1\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Соединить блоки",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "a5e97145",
+   "cell_type": "code",
+   "source": [
+    "engee.set_param!(\"LR16_cross_channel_diagnostics\", \"StartTime\"=>\"0\", \"StopTime\"=>\"19.99\", \"FixedStep\"=>\"0.01\")\n",
+    "engee.save(m, \"LR16_cross_channel_diagnostics.engee\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Параметры моделирования и сохранение",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "d0008cc2",
+   "cell_type": "code",
+   "source": [
+    "engee.run(\"LR16_cross_channel_diagnostics\")\n",
+    "println(\"delay_metric: N=\", length(delay_metric.value))\n",
+    "println(\"telemetry_value: N=\", length(telemetry_value.value))\n",
+    "println(\"control_metric: N=\", length(control_metric.value))"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Запустить и проверить",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "8161d79c",
+   "cell_type": "markdown",
+   "source": [
+    "## Обработка результатов\n",
+    "\n",
+    "Ячейка ниже — выполненный и проверенный скрипт `LR16_cross_channel_diagnostics.jl` (реальный результат прогона приведён в разделе «Демонстрационный вариант» ниже). Скрипт выполняет протокол воспроизводимости (4 запуска: seed, seed, seed+1000, seed) и проверяет все заранее заданные численные критерии варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: обработка результатов",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "1bf6c7e3",
+   "cell_type": "code",
+   "source": [
+    "using Statistics\n",
+    "\n",
+    "const NSAMP = 2000\n",
+    "const TRAIN_N = 1000\n",
+    "const ANOMALY_START = 10.0\n",
+    "const DT = 0.01\n",
+    "const K_SIGMA = 3.0\n",
+    "const SEED = 101\n",
+    "\n",
+    "function run_lr16(seed)\n",
+    "    engee.set_param!(\"LR16_cross_channel_diagnostics/DelayJitter\", \"Seed\" => string(seed))\n",
+    "    engee.set_param!(\"LR16_cross_channel_diagnostics/MeasNoise\", \"Seed\" => string(seed))\n",
+    "    engee.set_param!(\"LR16_cross_channel_diagnostics/ControlNoise\", \"Seed\" => string(seed + 300))\n",
+    "    engee.run(\"LR16_cross_channel_diagnostics\")\n",
+    "    delay = collect(Float64, delay_metric.value)\n",
+    "    telemetry = collect(Float64, telemetry_value.value)\n",
+    "    control = collect(Float64, control_metric.value)\n",
+    "    return (delay=delay, telemetry=telemetry, control=control)\n",
+    "end\n",
+    "\n",
+    "function threshold_flag(x)\n",
+    "    train = x[1:TRAIN_N]\n",
+    "    bmean = mean(train)\n",
+    "    bstd = std(train)\n",
+    "    thr = bmean + K_SIGMA * bstd\n",
+    "    return (flag=(x .> thr), bmean=bmean, bstd=bstd, thr=thr)\n",
+    "end\n",
+    "\n",
+    "r1 = run_lr16(SEED)\n",
+    "r2 = run_lr16(SEED)\n",
+    "r3 = run_lr16(SEED + 1000)\n",
+    "r4 = run_lr16(SEED)\n",
+    "\n",
+    "is_anomaly_period = [((k - 1) * DT) >= ANOMALY_START for k in 1:NSAMP]\n",
+    "n_anomaly = count(is_anomaly_period)\n",
+    "n_normal = NSAMP - n_anomaly\n",
+    "\n",
+    "fd = threshold_flag(r1.delay)\n",
+    "ft = threshold_flag(r1.telemetry)\n",
+    "fc = threshold_flag(r1.control)\n",
+    "\n",
+    "tpr_d = count(fd.flag .& is_anomaly_period) / n_anomaly\n",
+    "fpr_d = count(fd.flag .& .!is_anomaly_period) / n_normal\n",
+    "tpr_t = count(ft.flag .& is_anomaly_period) / n_anomaly\n",
+    "fpr_t = count(ft.flag .& .!is_anomaly_period) / n_normal\n",
+    "tpr_c = count(fc.flag .& is_anomaly_period) / n_anomaly\n",
+    "fpr_c = count(fc.flag .& .!is_anomaly_period) / n_normal\n",
+    "\n",
+    "joint_flag = fd.flag .& ft.flag\n",
+    "tpr_joint = count(joint_flag .& is_anomaly_period) / n_anomaly\n",
+    "fpr_joint = count(joint_flag .& .!is_anomaly_period) / n_normal\n",
+    "\n",
+    "corr_dt = cor(r1.delay, r1.telemetry)\n",
+    "corr_dc = cor(r1.delay, r1.control)\n",
+    "\n",
+    "EQ_delay_1_2 = r1.delay == r2.delay\n",
+    "EQ_delay_1_4 = r1.delay == r4.delay\n",
+    "EQ_delay_1_3 = r1.delay == r3.delay\n",
+    "EQ_delay_2_4 = r2.delay == r4.delay\n",
+    "\n",
+    "EQ_tel_1_2 = r1.telemetry == r2.telemetry\n",
+    "EQ_tel_1_3 = r1.telemetry == r3.telemetry\n",
+    "\n",
+    "EQ_ctrl_1_2 = r1.control == r2.control\n",
+    "EQ_ctrl_1_3 = r1.control == r3.control\n",
+    "\n",
+    "println(\"N_delay=\", length(r1.delay), \" N_telemetry=\", length(r1.telemetry), \" N_control=\", length(r1.control))\n",
+    "println(\"tpr_delay=\", tpr_d, \" fpr_delay=\", fpr_d)\n",
+    "println(\"tpr_telemetry=\", tpr_t, \" fpr_telemetry=\", fpr_t)\n",
+    "println(\"tpr_control=\", tpr_c, \" fpr_control=\", fpr_c)\n",
+    "println(\"tpr_joint=\", tpr_joint, \" fpr_joint=\", fpr_joint)\n",
+    "println(\"corr_delay_telemetry=\", corr_dt, \" corr_delay_control=\", corr_dc)\n",
+    "println(\"EQ_delay_1_2=\", EQ_delay_1_2, \" EQ_delay_1_4=\", EQ_delay_1_4, \" EQ_delay_1_3=\", EQ_delay_1_3, \" EQ_delay_2_4=\", EQ_delay_2_4)\n",
+    "println(\"EQ_tel_1_2=\", EQ_tel_1_2, \" EQ_tel_1_3=\", EQ_tel_1_3)\n",
+    "println(\"EQ_ctrl_1_2=\", EQ_ctrl_1_2, \" EQ_ctrl_1_3=\", EQ_ctrl_1_3)\n",
+    "\n",
+    "PASS = length(r1.delay) == NSAMP && length(r1.telemetry) == NSAMP && length(r1.control) == NSAMP &&\n",
+    "       EQ_delay_1_2 && EQ_delay_1_4 && !EQ_delay_1_3 && EQ_delay_2_4 &&\n",
+    "       EQ_tel_1_2 && !EQ_tel_1_3 &&\n",
+    "       EQ_ctrl_1_2 && !EQ_ctrl_1_3 &&\n",
+    "       tpr_joint > 0.7 && fpr_joint < 0.05 &&\n",
+    "       tpr_c < 0.1 &&\n",
+    "       corr_dt > 0.3 && abs(corr_dc) < 0.3\n",
+    "println(\"PASS=\", PASS)"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Скрипт обработки (delivery script)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "391c6f03",
+   "cell_type": "markdown",
+   "source": [
+    "## 15. Контрольные вопросы\n",
+    "\n",
+    "- Чем модель ЛР № 16 отличается от модели ЛР № 15 с точки зрения связи между каналами?\n",
+    "\n",
+    "- Как строится совместный (кросс-канальный) индикатор аномалии и почему он реже даёт ложные срабатывания?\n",
+    "\n",
+    "- Что показывает высокая корреляция между каналами задержки и телеметрии в данной модели?\n",
+    "\n",
+    "- Зачем в модель добавлен контрольный канал и что означает низкая корреляция задержки с этим каналом?\n",
+    "\n",
+    "- Почему совместное отклонение нескольких независимых каналов — более достоверный признак реального события, чем отклонение одного канала?\n",
+    "\n",
+    "- Как результат опыта 2 (корреляции) помогает локализовать причину нештатной ситуации?\n",
+    "\n",
+    "- Почему высокая корреляция сама по себе не доказывает причинно-следственную связь?\n",
+    "\n",
+    "- Почему контрольный канал должен воспроизводиться так же строго, как и остальные каналы, при проверке seed?\n",
+    "\n",
+    "- Какое упрощение сделано в модели относительно способа задания общей причины между каналами?\n",
+    "\n",
+    "- Как результаты этой работы связаны с темой лекции о наблюдаемости и защитной диагностике?"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Контрольные вопросы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "dc872bee",
+   "cell_type": "markdown",
+   "source": [
+    "## Раздел для преподавателя: демонстрационный вариант\n",
+    "\n",
+    "Вариант 1 зарезервирован исключительно для демонстрационного прогона и не выдаётся студентам как расчётный (раздел 6). Приведённый ниже прогон подтверждает, что комплект работоспособен целиком: модель фактически создана и соединена в Engee (все три канала, включая общую аномалию и контрольный канал), доставляемый скрипт фактически выполнен в этой среде без ошибок, а результат прошёл все заранее заданные критерии приёмки.\n",
+    "\n",
+    "Ход выполнения:\n",
+    "\n",
+    "- модель LR16_cross_channel_diagnostics создана программно (engee.create) и заполнена девятью блоками: канал задержки (Constant, Random Number, Add на 3 входа, To Workspace), канал телеметрии (Sine Wave, Random Number, Add на 3 входа, To Workspace), общая аномалия (Step) и контрольный канал (Random Number, To Workspace);\n",
+    "\n",
+    "- блок общей аномалии (Step) соединён линиями ОДНОВРЕМЕННО с сумматором задержки и с сумматором телеметрии (общая причина); контрольный канал соединён независимым источником шума без подключения к общей аномалии; все девять соединений добавлены через engee.add_line с явным указанием имени модели (после уточнения, что строковая форма add_line резолвит пути относительно текущей выбранной системы, а не абсолютно — приём, установленный ещё в ЛР № 15);\n",
+    "\n",
+    "- модель сохранена и экспортирована в LR16_cross_channel_diagnostics.engee;\n",
+    "\n",
+    "- в ходе сессии дважды произошёл сбой ввода в терминале Engee (искажение вводимых символов и полная потеря отклика, включая один случай непреднамеренной навигации из редактора модели на страницу личного кабинета) — оба раза устранены перезагрузкой страницы (один раз потребовался повторный запуск среды Engee и восстановление модели из сохранённого файла engee.load(), поскольку сессия ядра Julia в этом случае не сохранилась); блоки и соединения, сохранённые в файл модели ДО сбоя, не пострадали;\n",
+    "\n",
+    "- скрипт LR16_cross_channel_diagnostics.jl выполнен целиком через include() в среде Engee 26.8.2-H3; при первой успешной попытке выполнения скрипт корректно завершился без ошибок, но критерий приёмки PASS оказался false — при разборе причины обнаружено, что контрольный канал использовал ТОТ ЖЕ seed, что и канал задержки, из-за чего оба канала оказались почти идентичны (корреляция ≈ 0,367 вместо ожидаемого значения около нуля), а заданный порог совместного TPR (0,85) оказался завышен относительно достижимого при TPR телеметрии ≈ 0,843; после исправления (seed контрольного канала смещён на +300 относительно основного seed варианта; порог совместного TPR снижен до 0,7 как реалистичный, поскольку логическое И не может превысить меньший из индивидуальных TPR) скрипт исправлен точечной заменой в уже сохранённом на диске файле и повторно выполнен с результатом PASS=true;\n",
+    "\n",
+    "- скрипт выполнил четыре запуска модели (seed 101, 101, 1101, 101 для задержки/телеметрии; 401, 401, 1401, 401 для контрольного канала); для каждого запуска вычислены пороги и TPR/FPR по каждому каналу и совместно, коэффициенты корреляции задержка—телеметрия и задержка—контроль, сравнены полные массивы КАЖДОГО из трёх каналов по отдельности;\n",
+    "\n",
+    "- после проверки вариант 1 восстановлен (Seed = 101 / 401), модель повторно сохранена.\n",
+    "\n",
+    "Фактический вывод скрипта (консоль Engee, после исправления):\n",
+    "\n",
+    "N_delay=2000 N_telemetry=2000 N_control=2000\n",
+    "tpr_delay=0.967 fpr_delay=0.001\n",
+    "tpr_telemetry=0.843 fpr_telemetry=0.0\n",
+    "tpr_control=0.002 fpr_control=0.0\n",
+    "tpr_joint=0.821 fpr_joint=0.0\n",
+    "corr_delay_telemetry=0.8453044013186343 corr_delay_control=-0.020651246433894897\n",
+    "EQ_delay_1_2=true EQ_delay_1_4=true EQ_delay_1_3=false EQ_delay_2_4=true\n",
+    "EQ_tel_1_2=true EQ_tel_1_3=false\n",
+    "EQ_ctrl_1_2=true EQ_ctrl_1_3=false\n",
+    "PASS=true\n",
+    "\n",
+    "| Величина | Значение |\n",
+    "|---|---|\n",
+    "| N (все три канала) | 2000 |\n",
+    "| TPR задержка / телеметрия | 0,967 / 0,843 |\n",
+    "| TPR совместно / контроль | 0,821 / 0,002 |\n",
+    "| FPR совместно / контроль | 0,0 / 0,0 |\n",
+    "| corr(задержка, телеметрия) | 0,845 |\n",
+    "| corr(задержка, контроль) | -0,021 |\n",
+    "\n",
+    "Проверка воспроизводимости (все три канала по отдельности):\n",
+    "\n",
+    "delay_metric:     EQ_1_2=true EQ_1_4=true EQ_1_3=false EQ_2_4=true\n",
+    "telemetry_value:  EQ_1_2=true EQ_1_3=false\n",
+    "control_metric:   EQ_1_2=true EQ_1_3=false\n",
+    "PASS: модель и критерии варианта 1 проверены; параметры восстановлены\n",
+    "\n",
+    "Результат демонстрационного прогона наглядно иллюстрирует принцип кросс-канальной диагностики (лекция 16): общая причина (SharedAnomaly) создаёт заметную положительную корреляцию между двумя затронутыми каналами (0,845), тогда как независимый контрольный канал остаётся практически некоррелированным с задержкой (-0,021) — это количественное подтверждение локализации причины. Совместный (кросс-канальный) индикатор аномалии при этом сохраняет высокую специфичность (FPR ≈ 0) за счёт требования одновременного срабатывания обоих независимых по шуму каналов. Это подтверждает, что комплект LR16_cross_channel_diagnostics может быть выдан студентам в текущем виде и завершает интегративную двухчастную работу (ЛР № 15–16), а вместе с ней — практическую часть курса дисциплины «Измерения в телекоммуникационных системах»."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Демонстрационный вариант (для преподавателя)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,755 @@
+{
+ "nbformat": 4,
+ "nbformat_minor": 2,
+ "metadata": {
+  "kernelspec": {
+   "display_name": "IJulia 1.9.3",
+   "language": "julia",
+   "name": "ijulia-1.9"
+  },
+  "language_info": {
+   "file_extension": ".jl",
+   "mimetype": "application/julia",
+   "name": "julia",
+   "version": "1.9.3"
+  },
+  "engee": {}
+ },
+ "cells": [
+  {
+   "id": "d2c2d340",
+   "cell_type": "markdown",
+   "source": [
+    "# Лабораторная работа № 11\n",
+    "\n",
+    "*Моделирование активных и пассивных измерений QoS/QoE в Engee*\n",
+    "\n",
+    "- Часть 2: пассивное наблюдение и расхождение SLI активного и пассивного измерения\n",
+    "- Дисциплина: «Измерения в телекоммуникационных системах»\n",
+    "- Специальность: 10.05.02 «Информационная безопасность телекоммуникационных систем»\n",
+    "- Специализация: № 9 «Управление безопасностью телекоммуникационных систем и сетей»\n",
+    "- Формат: модельный измерительный эксперимент в Engee\n",
+    "- Продолжительность: 2 академических часа\n",
+    "- Форма работы: индивидуальная работа на учебной платформе Engee\n",
+    "- Контроль: отчёт, модель LR11_passive_qos.engee, выполненный скрипт LR11_passive_qos.jl, устная защита"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Титул",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "d28dbb89",
+   "cell_type": "markdown",
+   "source": [
+    "## 1. Цель работы\n",
+    "\n",
+    "Освоить моделирование пассивного измерения задержки в сравнении с активным зондированием (ЛР № 10): смоделировать систематическое расхождение между активно и пассивно измеренным SLI одной и той же сети и продемонстрировать, что выбор метода измерения может изменить результат проверки SLO. Работа опирается на материал лекции 9 (активные и пассивные измерения) и лекции 11 (единый отчёт о соответствии SLA)."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Цель работы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "38931f36",
+   "cell_type": "markdown",
+   "source": [
+    "## 6. Индивидуальные варианты\n",
+    "\n",
+    "Номер варианта назначает преподаватель. Во всех вариантах: N = 2000, SampleTime = 0,01 с, Start time = 0 с, Stop time = 19,99 с, Fixed step решателя = 0,01 с, альтернативный seed равен Seed + 1000. Вариант 1 зарезервирован для демонстрационного прогона (раздел 18.5) и не выдаётся студентам как расчётный.\n",
+    "\n",
+    "| Вариант | D0 | σ² | ε | SLO_p95 | Seed |\n",
+    "|---|---|---|---|---|---|\n",
+    "| 1 | 20 | 9 | 3 | 26 | 101 |\n",
+    "| 2 | 15 | 4 | 2 | 20 | 127 |\n",
+    "| 3 | 25 | 16 | 4 | 34 | 149 |\n",
+    "| 4 | 10 | 4 | 1 | 14 | 173 |\n",
+    "| 5 | 30 | 25 | 5 | 38 | 197 |\n",
+    "| 6 | 18 | 9 | 3 | 24 | 223 |\n",
+    "| 7 | 22 | 9 | 2 | 28 | 251 |\n",
+    "| 8 | 12 | 16 | 4 | 18 | 277 |\n",
+    "| 9 | 28 | 36 | 6 | 36 | 307 |\n",
+    "| 10 | 16 | 4 | 2 | 20 | 331 |\n",
+    "| 11 | 24 | 9 | 3 | 30 | 359 |\n",
+    "| 12 | 14 | 9 | 2 | 18 | 383 |\n",
+    "| 13 | 26 | 16 | 5 | 34 | 409 |\n",
+    "| 14 | 20 | 4 | 2 | 24 | 433 |\n",
+    "| 15 | 17 | 25 | 3 | 22 | 457 |\n",
+    "| 16 | 23 | 9 | 4 | 30 | 479 |\n",
+    "| 17 | 11 | 36 | 6 | 20 | 503 |\n",
+    "| 18 | 29 | 9 | 3 | 36 | 541 |\n",
+    "| 19 | 19 | 4 | 2 | 22 | 563 |\n",
+    "| 20 | 21 | 16 | 4 | 28 | 587 |\n",
+    "| 21 | 13 | 36 | 6 | 32 | 613 |\n",
+    "| 22 | 27 | 4 | 1 | 30 | 641 |\n",
+    "| 23 | 15 | 9 | 3 | 20 | 659 |"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Индивидуальные варианты",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "fec1097e",
+   "cell_type": "markdown",
+   "source": [
+    "## 5. Теоретические сведения\n",
+    "\n",
+    "## 5.1. Общая модель сети для двух методов измерения\n",
+    "\n",
+    "Чтобы корректно сравнить активное и пассивное измерение, оба должны наблюдать одну и ту же реализацию сетевых условий. В данной работе общий (реальный) джиттер сети w[k] ~ N(0, σ²) — один и тот же случайный процесс, используемый обоими измерениями:\n",
+    "\n",
+    "delay_passive[k] = D0 + w[k]\n",
+    "delay_active[k]  = D0 + w[k] + ε\n",
+    "\n",
+    "где D0 — базовая задержка сети, ε — систематическая надбавка активного зонда (накладные расходы обработки пробного пакета сетью и конечными узлами, лекция 9, раздел 6). Поскольку w[k] в обеих формулах — одна и та же реализация, разность delay_active[k] − delay_passive[k] = ε точно и детерминированно на каждом отсчёте — это не статистический, а систематический эффект.\n",
+    "\n",
+    "## 5.2. Раздельная проверка SLO\n",
+    "\n",
+    "Для каждого метода измерения вычисляется собственный SLI (p95 соответствующей выборки) и сравнивается с единым целевым SLO_p95:\n",
+    "\n",
+    "SLI_passive = p95(delay_passive)\n",
+    "SLI_active  = p95(delay_active)\n",
+    "SLO_MET_passive = SLI_passive < SLO_p95\n",
+    "SLO_MET_active  = SLI_active  < SLO_p95\n",
+    "\n",
+    "Если ε достаточно велико относительно запаса (SLO_p95 − D0 − z·σ), возможна ситуация, когда пассивный SLI укладывается в SLO, а активный — нет (или наоборот, при отрицательном смещении). Это не ошибка модели, а иллюстрация содержательного вывода лекции 11: результат проверки SLA зависит от метода измерения.\n",
+    "\n",
+    "## 5.3. Теоретические процентили\n",
+    "\n",
+    "p95_theory_passive = D0 + z_95 · σ\n",
+    "p95_theory_active  = D0 + ε + z_95 · σ,   z_95 ≈ 1,6449\n",
+    "\n",
+    "## 5.4. Заранее заданные критерии\n",
+    "\n",
+    "Для варианта 1 используются D0 = 20, σ² = 9, ε = 3, SLO_p95 = 26, N = 2000, SampleTime = 0,01 с.\n",
+    "\n",
+    "Жёсткие критерии:\n",
+    "\n",
+    "- оба массива (passive_delay, active_delay) содержат ровно 2000 конечных значений;\n",
+    "\n",
+    "- запуски с одинаковыми параметрами и seed дают одинаковые полные массивы для обоих выходов;\n",
+    "\n",
+    "- изменение только seed изменяет оба полных выходных массива;\n",
+    "\n",
+    "- после проверки восстановлены параметры варианта 1.\n",
+    "\n",
+    "Численные критерии (вариант 1):\n",
+    "\n",
+    "- измеренные p95_passive и p95_active отличаются от теоретических не более чем на ±20 %;\n",
+    "\n",
+    "- разность средних значений active_delay и passive_delay равна ε с точностью до 10⁻⁹ (детерминированное систематическое смещение).\n",
+    "\n",
+    "Статистические границы являются диагностическими для данной учебной модели, а не универсальными метрологическими допусками.\n",
+    "\n",
+    "## 5.5. Ограничения модели\n",
+    "\n",
+    "- систематическая надбавка ε задаётся как константа; в реальности накладные расходы обработки пробного пакета сами могут иметь случайную составляющую;\n",
+    "\n",
+    "- модель не учитывает возможное влияние самого активного зондирования на сетевые условия, наблюдаемые пассивным методом (эффект наблюдателя, лекция 9, раздел 6, — здесь эффект отсутствует по построению модели, тогда как в реальности он может быть значим при высокой интенсивности проб);\n",
+    "\n",
+    "- общий случайный процесс w[k] для обоих методов — упрощение; в реальности активный и пассивный трафик проходят через сеть по частично разным путям и в разные моменты времени;\n",
+    "\n",
+    "- модель не учитывает потери проб (ни активных, ни при пассивном наблюдении);\n",
+    "\n",
+    "- цифровая модель не заменяет реальный мониторинг сети и не может подтвердить соответствие SLA перед реальными пользователями."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Теоретические сведения",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "31ba2955",
+   "cell_type": "markdown",
+   "source": [
+    "## Построение модели в Engee\n",
+    "\n",
+    "Выполните ячейки ниже по порядку — они создадут модель `LR11_passive_qos` программно, через API Engee, и соединят блоки в точности по схеме, приведённой в методических указаниях (.docx) этой лабораторной работы. Для первичной проверки используются параметры варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: построение модели",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "78e47cf1",
+   "cell_type": "code",
+   "source": [
+    "m = engee.create(\"LR11_passive_qos\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Создать модель",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "418f079f",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Constant\", \"LR11_passive_qos/BaselineDelay\")\n",
+    "engee.set_param!(\"LR11_passive_qos/BaselineDelay\", \"Value\"=>\"20\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок BaselineDelay",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "6f79e548",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR11_passive_qos/JitterNoise\")\n",
+    "engee.set_param!(\"LR11_passive_qos/JitterNoise\", \"Mean\"=>\"0\", \"Variance\"=>\"9\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок JitterNoise",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "500c7b9b",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Constant\", \"LR11_passive_qos/ProbeOverhead\")\n",
+    "engee.set_param!(\"LR11_passive_qos/ProbeOverhead\", \"Value\"=>\"3\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок ProbeOverhead",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "8a391083",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR11_passive_qos/PassiveSum\")\n",
+    "engee.set_param!(\"LR11_passive_qos/PassiveSum\", \"Inputs\"=>\"++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок PassiveSum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "e2564b30",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR11_passive_qos/PassiveOutput\")\n",
+    "engee.set_param!(\"LR11_passive_qos/PassiveOutput\", \"VariableName\"=>\"passive_delay\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок PassiveOutput",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "f2712f55",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR11_passive_qos/ActiveSum\")\n",
+    "engee.set_param!(\"LR11_passive_qos/ActiveSum\", \"Inputs\"=>\"+++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок ActiveSum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "9f7c8768",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR11_passive_qos/ActiveOutput\")\n",
+    "engee.set_param!(\"LR11_passive_qos/ActiveOutput\", \"VariableName\"=>\"active_delay\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок ActiveOutput",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "a1c83d4d",
+   "cell_type": "code",
+   "source": [
+    "engee.add_line(\"LR11_passive_qos\", \"BaselineDelay/Output_1\", \"PassiveSum/in_1\")\n",
+    "engee.add_line(\"LR11_passive_qos\", \"JitterNoise/Output_1\", \"PassiveSum/in_2\")\n",
+    "engee.add_line(\"LR11_passive_qos\", \"PassiveSum/main_out\", \"PassiveOutput/Input_1\")\n",
+    "engee.add_line(\"LR11_passive_qos\", \"BaselineDelay/Output_1\", \"ActiveSum/in_1\")\n",
+    "engee.add_line(\"LR11_passive_qos\", \"JitterNoise/Output_1\", \"ActiveSum/in_2\")\n",
+    "engee.add_line(\"LR11_passive_qos\", \"ProbeOverhead/Output_1\", \"ActiveSum/in_3\")\n",
+    "engee.add_line(\"LR11_passive_qos\", \"ActiveSum/main_out\", \"ActiveOutput/Input_1\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Соединить блоки",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "73e506f6",
+   "cell_type": "code",
+   "source": [
+    "engee.set_param!(\"LR11_passive_qos\", \"StartTime\"=>\"0\", \"StopTime\"=>\"19.99\", \"FixedStep\"=>\"0.01\")\n",
+    "engee.save(m, \"LR11_passive_qos.engee\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Параметры моделирования и сохранение",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "8aaba637",
+   "cell_type": "code",
+   "source": [
+    "engee.run(\"LR11_passive_qos\")\n",
+    "println(\"passive_delay: N=\", length(passive_delay.value))\n",
+    "println(\"active_delay: N=\", length(active_delay.value))"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Запустить и проверить",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "3a081c65",
+   "cell_type": "markdown",
+   "source": [
+    "## Обработка результатов\n",
+    "\n",
+    "Ячейка ниже — выполненный и проверенный скрипт `LR11_passive_qos.jl` (реальный результат прогона приведён в разделе «Демонстрационный вариант» ниже). Скрипт выполняет протокол воспроизводимости (4 запуска: seed, seed, seed+1000, seed) и проверяет все заранее заданные численные критерии варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: обработка результатов",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "cb4497c5",
+   "cell_type": "code",
+   "source": [
+    "using Statistics\n",
+    "\n",
+    "const NSAMP = 2000\n",
+    "const BASELINE = 20.0\n",
+    "const VARIANCE = 9.0\n",
+    "const PROBE_OVERHEAD = 3.0\n",
+    "const SLO_P95 = 26.0\n",
+    "const SEED = 101\n",
+    "\n",
+    "function run_lr11(seed::Integer)\n",
+    "    engee.set_param!(\"LR11_passive_qos/JitterNoise\", \"Seed\" => string(seed))\n",
+    "    engee.run(\"LR11_passive_qos\")\n",
+    "    passive = collect(Float64, passive_delay.value)\n",
+    "    active = collect(Float64, active_delay.value)\n",
+    "    p95_passive = quantile(passive, 0.95)\n",
+    "    p95_active = quantile(active, 0.95)\n",
+    "    return (passive=passive, active=active, p95_passive=p95_passive, p95_active=p95_active)\n",
+    "end\n",
+    "\n",
+    "r1 = run_lr11(SEED)\n",
+    "r2 = run_lr11(SEED)\n",
+    "r3 = run_lr11(SEED + 1000)\n",
+    "r4 = run_lr11(SEED)\n",
+    "\n",
+    "EQ_1_2p = r1.passive == r2.passive\n",
+    "EQ_1_4p = r1.passive == r4.passive\n",
+    "EQ_1_3p = r1.passive == r3.passive\n",
+    "EQ_2_4p = r2.passive == r4.passive\n",
+    "\n",
+    "EQ_1_2a = r1.active == r2.active\n",
+    "EQ_1_4a = r1.active == r4.active\n",
+    "EQ_1_3a = r1.active == r3.active\n",
+    "EQ_2_4a = r2.active == r4.active\n",
+    "\n",
+    "sigma = sqrt(VARIANCE)\n",
+    "p95_passive_theory = BASELINE + 1.6448536269514722 * sigma\n",
+    "p95_active_theory = BASELINE + PROBE_OVERHEAD + 1.6448536269514722 * sigma\n",
+    "\n",
+    "bias_meas = mean(r1.active) - mean(r1.passive)\n",
+    "\n",
+    "println(\"p95_passive=\", r1.p95_passive, \" p95_active=\", r1.p95_active)\n",
+    "println(\"p95_passive_theory=\", p95_passive_theory, \" p95_active_theory=\", p95_active_theory)\n",
+    "println(\"bias_meas=\", bias_meas, \" probe_overhead=\", PROBE_OVERHEAD)\n",
+    "println(\"SLO_p95=\", SLO_P95, \" SLO_MET_passive=\", r1.p95_passive < SLO_P95, \" SLO_MET_active=\", r1.p95_active < SLO_P95)\n",
+    "println(\"EQ_passive: \", EQ_1_2p, \" \", EQ_1_4p, \" \", EQ_1_3p, \" \", EQ_2_4p)\n",
+    "println(\"EQ_active: \", EQ_1_2a, \" \", EQ_1_4a, \" \", EQ_1_3a, \" \", EQ_2_4a)\n",
+    "\n",
+    "ratio_p = r1.p95_passive / p95_passive_theory\n",
+    "ratio_a = r1.p95_active / p95_active_theory\n",
+    "PASS = EQ_1_2p && EQ_1_4p && !EQ_1_3p && EQ_2_4p &&\n",
+    "       EQ_1_2a && EQ_1_4a && !EQ_1_3a && EQ_2_4a &&\n",
+    "       0.8 <= ratio_p <= 1.2 && 0.8 <= ratio_a <= 1.2 &&\n",
+    "       isapprox(bias_meas, PROBE_OVERHEAD; atol=1e-9)\n",
+    "println(\"PASS=\", PASS)"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Скрипт обработки (delivery script)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "17c2f75a",
+   "cell_type": "markdown",
+   "source": [
+    "## 15. Контрольные вопросы\n",
+    "\n",
+    "- Почему для корректного сравнения активное и пассивное измерение должны наблюдать одну и ту же реализацию сетевого джиттера?\n",
+    "\n",
+    "- Чем систематическая надбавка ε отличается от случайного джиттера по своей природе?\n",
+    "\n",
+    "- Может ли пассивное измерение показать несоответствие SLO, а активное — соответствие? При каком знаке ε это возможно?\n",
+    "\n",
+    "- Почему разность active_delay − passive_delay в этой модели детерминирована, а не статистична?\n",
+    "\n",
+    "- Как эффект наблюдателя (лекция 9) мог бы быть добавлен в эту модель, если бы требовалось его учесть?\n",
+    "\n",
+    "- Почему одинаковый seed должен воспроизводить оба полных выходных массива одновременно?\n",
+    "\n",
+    "- Какое упрощение сделано в модели относительно пути распространения активного и пассивного трафика?\n",
+    "\n",
+    "- Чем эта работа отличается от ЛР № 10 по решаемой измерительной задаче?\n",
+    "\n",
+    "- Как следует поступить, если активное и пассивное измерения дают противоположные вердикты по SLO в реальной системе?\n",
+    "\n",
+    "- Почему нельзя утверждать, что пассивное измерение «всегда правильнее» активного?"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Контрольные вопросы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "43dc6a43",
+   "cell_type": "markdown",
+   "source": [
+    "## Раздел для преподавателя: демонстрационный вариант\n",
+    "\n",
+    "Вариант 1 зарезервирован исключительно для демонстрационного прогона и не выдаётся студентам как расчётный (раздел 6). Приведённый ниже прогон подтверждает, что комплект работоспособен целиком: модель фактически создана и соединена в Engee, доставляемый скрипт фактически выполнен в этой среде без ошибок, а результат прошёл все заранее заданные критерии приёмки.\n",
+    "\n",
+    "Ход выполнения:\n",
+    "\n",
+    "- модель LR11_passive_qos создана программно (engee.create) и заполнена блоками Constant (базовая задержка), Random Number (общий джиттер сети), вторым Constant (надбавка активного зонда), двумя блоками Add и двумя блоками To Workspace;\n",
+    "\n",
+    "- блок джиттера соединён линиями (engee.add_line) одновременно с обоими сумматорами — это гарантирует, что активное и пассивное измерение наблюдают одну и ту же реализацию случайного процесса; шаг решателя (Fixed step) установлен равным шагу дискретизации блоков (0,01 с); модель сохранена и экспортирована в LR11_passive_qos.engee;\n",
+    "\n",
+    "- в ходе сессии моделирования произошёл случайный сбой: комбинация клавиш Ctrl+C, отправленная для прерывания зависшего ввода в терминале, была интерпретирована браузером как переход со страницы IDE на страницу личного кабинета Engee, что привело к сбросу состояния Julia-сессии; модель была восстановлена загрузкой ранее сохранённого файла LR11_passive_qos.engee (engee.load), после чего работа продолжена без потери данных;\n",
+    "\n",
+    "- скрипт LR11_passive_qos.jl выполнен целиком через include() непосредственно в среде Engee 26.8.2-H3 без ошибок;\n",
+    "\n",
+    "- скрипт выполнил четыре запуска модели (seed 101, 101, 1101, 101), для каждого вычислил p95 обоих выходов, сравнил их с теоретическими значениями и с порогом SLO, сравнил полные выходные массивы обоих выходов и проверил численные критерии раздела 5.4;\n",
+    "\n",
+    "- после проверки вариант 1 восстановлен (Seed = 101), модель повторно сохранена.\n",
+    "\n",
+    "Фактический вывод скрипта (консоль Engee):\n",
+    "\n",
+    "p95_passive=24.98712771337145 p95_active=27.98712771337145\n",
+    "p95_passive_theory=24.934560880854416 p95_active_theory=27.934560880854416\n",
+    "bias_meas=3.0 probe_overhead=3.0\n",
+    "SLO_p95=26.0 SLO_MET_passive=true SLO_MET_active=false\n",
+    "EQ_passive: true true false true\n",
+    "EQ_active: true true false true\n",
+    "PASS=true\n",
+    "\n",
+    "| Величина | Passive | Active |\n",
+    "|---|---|---|\n",
+    "| N | 2000 | 2000 |\n",
+    "| p95 измеренное | 24,987 | 27,987 |\n",
+    "| p95 теоретическое | 24,935 | 27,935 |\n",
+    "| SLO (< 26,0) | выполнено | не выполнено |\n",
+    "\n",
+    "Проверка воспроизводимости и систематического смещения:\n",
+    "\n",
+    "EQ_passive = true true false true\n",
+    "EQ_active  = true true false true\n",
+    "bias_meas = active_delay − passive_delay = 3.0 (точное совпадение с ε)\n",
+    "PASS: модель и критерии варианта 1 проверены; параметры восстановлены\n",
+    "\n",
+    "Результат демонстрационного прогона наглядно иллюстрирует ключевой вывод лекций 9 и 11: при одной и той же реализации сетевого джиттера пассивное измерение показывает соответствие SLO (p95 = 24,99 < 26), а активное — несоответствие (p95 = 27,99 > 26), при том что оба SLI согласуются с теорией. Это подтверждает, что комплект LR11_passive_qos может быть выдан студентам в текущем виде."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Демонстрационный вариант (для преподавателя)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,712 @@
+{
+ "nbformat": 4,
+ "nbformat_minor": 2,
+ "metadata": {
+  "kernelspec": {
+   "display_name": "IJulia 1.9.3",
+   "language": "julia",
+   "name": "ijulia-1.9"
+  },
+  "language_info": {
+   "file_extension": ".jl",
+   "mimetype": "application/julia",
+   "name": "julia",
+   "version": "1.9.3"
+  },
+  "engee": {}
+ },
+ "cells": [
+  {
+   "id": "0f6dd49b",
+   "cell_type": "markdown",
+   "source": [
+    "# Лабораторная работа № 13\n",
+    "\n",
+    "*Корреляция метрик, журналов и трасс, сформированных моделью Engee*\n",
+    "\n",
+    "- Наблюдаемость: baseline и проверяемая гипотеза о причине аномалии метрики\n",
+    "- Дисциплина: «Измерения в телекоммуникационных системах»\n",
+    "- Специальность: 10.05.02 «Информационная безопасность телекоммуникационных систем»\n",
+    "- Специализация: № 9 «Управление безопасностью телекоммуникационных систем и сетей»\n",
+    "- Формат: модельный измерительный эксперимент в Engee\n",
+    "- Продолжительность: 2 академических часа\n",
+    "- Форма работы: индивидуальная работа на учебной платформе Engee\n",
+    "- Контроль: отчёт, модель LR13_metrics_logs_traces.engee, выполненный скрипт LR13_metrics_logs_traces.jl, устная защита"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Титул",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "1979cbf2",
+   "cell_type": "markdown",
+   "source": [
+    "## 1. Цель работы\n",
+    "\n",
+    "Освоить принцип корреляции метрик и журналов событий для проверки гипотезы о причине аномалии измеряемого показателя: смоделировать метрику с baseline-поведением и периодическими отклонениями, синхронизированными с журналом событий (логом), и количественно подтвердить связь между зафиксированным событием и изменением метрики."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Цель работы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "001842aa",
+   "cell_type": "markdown",
+   "source": [
+    "## 6. Индивидуальные варианты\n",
+    "\n",
+    "Номер варианта назначает преподаватель. Во всех вариантах: период события 0,5 с, длительность события 20 % периода, N = 2000, SampleTime = 0,01 с, Start time = 0 с, Stop time = 19,99 с, Fixed step решателя = 0,01 с, альтернативный seed равен Seed + 1000. Вариант 1 зарезервирован для демонстрационного прогона (раздел 18.5) и не выдаётся студентам как расчётный.\n",
+    "\n",
+    "| Вариант | D0 | σ² | ΔL | Seed |\n",
+    "|---|---|---|---|---|\n",
+    "| 1 | 20 | 4 | 15 | 101 |\n",
+    "| 2 | 15 | 2 | 10 | 127 |\n",
+    "| 3 | 25 | 9 | 20 | 149 |\n",
+    "| 4 | 10 | 1 | 8 | 173 |\n",
+    "| 5 | 30 | 16 | 25 | 197 |\n",
+    "| 6 | 18 | 4 | 12 | 223 |\n",
+    "| 7 | 22 | 6 | 18 | 251 |\n",
+    "| 8 | 12 | 2 | 9 | 277 |\n",
+    "| 9 | 28 | 12 | 22 | 307 |\n",
+    "| 10 | 16 | 4 | 11 | 331 |\n",
+    "| 11 | 24 | 5 | 16 | 359 |\n",
+    "| 12 | 14 | 2 | 10 | 383 |\n",
+    "| 13 | 26 | 9 | 21 | 409 |\n",
+    "| 14 | 20 | 3 | 13 | 433 |\n",
+    "| 15 | 17 | 7 | 17 | 457 |\n",
+    "| 16 | 23 | 4 | 14 | 479 |\n",
+    "| 17 | 11 | 16 | 24 | 503 |\n",
+    "| 18 | 29 | 5 | 15 | 541 |\n",
+    "| 19 | 19 | 1 | 9 | 563 |\n",
+    "| 20 | 21 | 12 | 20 | 587 |\n",
+    "| 21 | 13 | 3 | 12 | 613 |\n",
+    "| 22 | 27 | 6 | 18 | 641 |\n",
+    "| 23 | 15 | 4 | 13 | 659 |"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Индивидуальные варианты",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "734fb63b",
+   "cell_type": "markdown",
+   "source": [
+    "## 5. Теоретические сведения\n",
+    "\n",
+    "## 5.1. Наблюдаемость: метрики, журналы, трассы\n",
+    "\n",
+    "Наблюдаемость системы (лекция 14) опирается на три взаимодополняющих источника данных: метрики (агрегированные числовые временные ряды), журналы (log — дискретные записи о событиях с меткой времени) и трассы (детализированный путь обработки отдельного запроса). Диагностическая ценность возникает не от каждого источника по отдельности, а от их сопоставления: метрика показывает, ЧТО измерилось аномальным, а журнал — КОГДА и, возможно, ПОЧЕМУ.\n",
+    "\n",
+    "## 5.2. Модель метрики с известной причиной аномалии\n",
+    "\n",
+    "В данной работе метрика (например, задержка обработки запроса) моделируется как сумма трёх составляющих: базового уровня, случайного шума и периодического отклонения, вызванного известным (журналируемым) событием — например, кратковременным сбоем или всплеском нагрузки:\n",
+    "\n",
+    "metric[k] = D0 + w[k] + fault[k],   w[k] ~ N(0, σ²)\n",
+    "\n",
+    "где fault[k] — периодический импульсный сигнал (заранее известное расписание событий), одновременно являющийся записью в журнале событий: fault[k] > 0 означает «событие зафиксировано в журнале на отсчёте k».\n",
+    "\n",
+    "## 5.3. Проверка гипотезы: baseline против периода события\n",
+    "\n",
+    "Проверяемая гипотеза: аномалия метрики статистически связана с зафиксированным в журнале событием. Проверка выполняется сравнением среднего значения метрики вне периодов события (baseline) со средним значением метрики во время события:\n",
+    "\n",
+    "baseline_mean = mean(metric[fault_flag == false])\n",
+    "fault_mean    = mean(metric[fault_flag == true])\n",
+    "diff = fault_mean − baseline_mean   (ожидается ≈ ΔL)\n",
+    "\n",
+    "Дополнительно вычисляется коэффициент корреляции между полным рядом метрики и бинарным индикатором события журнала — количественная мера силы связи:\n",
+    "\n",
+    "r = corr(metric, fault_flag)\n",
+    "\n",
+    "## 5.4. Заранее заданные критерии\n",
+    "\n",
+    "Для варианта 1 используются D0 = 20, σ² = 4 (шум), ΔL = 15 (амплитуда события), период события 0,5 с, длительность события 20 % периода, N = 2000, SampleTime = 0,01 с.\n",
+    "\n",
+    "Жёсткие критерии:\n",
+    "\n",
+    "- оба массива (метрика и журнал событий) содержат ровно 2000 конечных значений;\n",
+    "\n",
+    "- запуски с одинаковыми параметрами и seed дают одинаковые полные массивы метрики;\n",
+    "\n",
+    "- изменение seed изменяет массив метрики, но НЕ изменяет журнал событий (журнал детерминирован и не зависит от seed случайного шума метрики) — это ожидаемое, а не ошибочное поведение;\n",
+    "\n",
+    "- после проверки восстановлены параметры варианта 1.\n",
+    "\n",
+    "Численные критерии (вариант 1):\n",
+    "\n",
+    "- измеренная разность (fault_mean − baseline_mean) отличается от ΔL не более чем на ±20 %;\n",
+    "\n",
+    "- коэффициент корреляции r между метрикой и индикатором события превышает 0,7.\n",
+    "\n",
+    "Статистические границы являются диагностическими для данной учебной модели, а не универсальными метрологическими допусками.\n",
+    "\n",
+    "## 5.5. Ограничения модели\n",
+    "\n",
+    "- в данной модели журнал событий и причина аномалии метрики связаны напрямую и детерминированно; в реальной системе связь между записью в журнале и изменением метрики устанавливается статистически и может быть неоднозначной;\n",
+    "\n",
+    "- рассматривается единственный тип события; реальные системы наблюдаемости сопоставляют множество одновременных источников журналов и трасс;\n",
+    "\n",
+    "- трассировка отдельных запросов (третий источник наблюдаемости) в данной работе не моделируется явно;\n",
+    "\n",
+    "- корреляция не доказывает причинно-следственную связь сама по себе — в модели причинность заложена конструктивно, а не выведена из данных;\n",
+    "\n",
+    "- цифровая модель не заменяет реальный анализ наблюдаемости продуктивной системы."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Теоретические сведения",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "f87b286c",
+   "cell_type": "markdown",
+   "source": [
+    "## Построение модели в Engee\n",
+    "\n",
+    "Выполните ячейки ниже по порядку — они создадут модель `LR13_metrics_logs_traces` программно, через API Engee, и соединят блоки в точности по схеме, приведённой в методических указаниях (.docx) этой лабораторной работы. Для первичной проверки используются параметры варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: построение модели",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "5c4e42bd",
+   "cell_type": "code",
+   "source": [
+    "m = engee.create(\"LR13_metrics_logs_traces\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Создать модель",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "c15155c7",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Constant\", \"LR13_metrics_logs_traces/BaselineLatency\")\n",
+    "engee.set_param!(\"LR13_metrics_logs_traces/BaselineLatency\", \"Value\"=>\"20\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок BaselineLatency",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "3f510ec0",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR13_metrics_logs_traces/Jitter\")\n",
+    "engee.set_param!(\"LR13_metrics_logs_traces/Jitter\", \"Mean\"=>\"0\", \"Variance\"=>\"4\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок Jitter",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "ccf73e7c",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Pulse Generator\", \"LR13_metrics_logs_traces/FaultPulse\")\n",
+    "engee.set_param!(\"LR13_metrics_logs_traces/FaultPulse\", \"Amplitude\"=>\"15\", \"Period\"=>\"0.5\", \"PulseWidth\"=>\"20\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок FaultPulse",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "cb21c751",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR13_metrics_logs_traces/MetricSum\")\n",
+    "engee.set_param!(\"LR13_metrics_logs_traces/MetricSum\", \"Inputs\"=>\"+++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок MetricSum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "9bc16878",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR13_metrics_logs_traces/MetricOutput\")\n",
+    "engee.set_param!(\"LR13_metrics_logs_traces/MetricOutput\", \"VariableName\"=>\"metric_latency\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок MetricOutput",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "2083347f",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR13_metrics_logs_traces/LogOutput\")\n",
+    "engee.set_param!(\"LR13_metrics_logs_traces/LogOutput\", \"VariableName\"=>\"log_fault_signal\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок LogOutput",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "8a8a11d6",
+   "cell_type": "code",
+   "source": [
+    "engee.add_line(\"LR13_metrics_logs_traces\", \"BaselineLatency/Output_1\", \"MetricSum/in_1\")\n",
+    "engee.add_line(\"LR13_metrics_logs_traces\", \"Jitter/Output_1\", \"MetricSum/in_2\")\n",
+    "engee.add_line(\"LR13_metrics_logs_traces\", \"FaultPulse/Output_1\", \"MetricSum/in_3\")\n",
+    "engee.add_line(\"LR13_metrics_logs_traces\", \"MetricSum/main_out\", \"MetricOutput/Input_1\")\n",
+    "engee.add_line(\"LR13_metrics_logs_traces\", \"FaultPulse/Output_1\", \"LogOutput/Input_1\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Соединить блоки",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "7004030b",
+   "cell_type": "code",
+   "source": [
+    "engee.set_param!(\"LR13_metrics_logs_traces\", \"StartTime\"=>\"0\", \"StopTime\"=>\"19.99\", \"FixedStep\"=>\"0.01\")\n",
+    "engee.save(m, \"LR13_metrics_logs_traces.engee\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Параметры моделирования и сохранение",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "e650d684",
+   "cell_type": "code",
+   "source": [
+    "engee.run(\"LR13_metrics_logs_traces\")\n",
+    "println(\"metric_latency: N=\", length(metric_latency.value))\n",
+    "println(\"log_fault_signal: N=\", length(log_fault_signal.value))"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Запустить и проверить",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "627afccf",
+   "cell_type": "markdown",
+   "source": [
+    "## Обработка результатов\n",
+    "\n",
+    "Ячейка ниже — выполненный и проверенный скрипт `LR13_metrics_logs_traces.jl` (реальный результат прогона приведён в разделе «Демонстрационный вариант» ниже). Скрипт выполняет протокол воспроизводимости (4 запуска: seed, seed, seed+1000, seed) и проверяет все заранее заданные численные критерии варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: обработка результатов",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "5f28eae4",
+   "cell_type": "code",
+   "source": [
+    "using Statistics\n",
+    "\n",
+    "const NSAMP = 2000\n",
+    "const BASELINE = 20.0\n",
+    "const DELTA_L = 15.0\n",
+    "const SEED = 101\n",
+    "\n",
+    "function run_lr13(seed::Integer)\n",
+    "    engee.set_param!(\"LR13_metrics_logs_traces/Jitter\", \"Seed\" => string(seed))\n",
+    "    engee.run(\"LR13_metrics_logs_traces\")\n",
+    "    metric = collect(Float64, metric_latency.value)\n",
+    "    logsig = collect(Float64, log_fault_signal.value)\n",
+    "    fault_flag = logsig .> 0.5\n",
+    "    baseline_mean = mean(metric[.!fault_flag])\n",
+    "    fault_mean = mean(metric[fault_flag])\n",
+    "    r = cor(metric, Float64.(fault_flag))\n",
+    "    return (metric=metric, logsig=logsig, baseline_mean=baseline_mean, fault_mean=fault_mean, r=r)\n",
+    "end\n",
+    "\n",
+    "r1 = run_lr13(SEED)\n",
+    "r2 = run_lr13(SEED)\n",
+    "r3 = run_lr13(SEED + 1000)\n",
+    "r4 = run_lr13(SEED)\n",
+    "\n",
+    "EQ_m_1_2 = r1.metric == r2.metric\n",
+    "EQ_m_1_4 = r1.metric == r4.metric\n",
+    "EQ_m_1_3 = r1.metric == r3.metric\n",
+    "EQ_m_2_4 = r2.metric == r4.metric\n",
+    "\n",
+    "EQ_l_1_2 = r1.logsig == r2.logsig\n",
+    "EQ_l_1_4 = r1.logsig == r4.logsig\n",
+    "EQ_l_1_3 = r1.logsig == r3.logsig\n",
+    "EQ_l_2_4 = r2.logsig == r4.logsig\n",
+    "\n",
+    "diff_means = r1.fault_mean - r1.baseline_mean\n",
+    "\n",
+    "println(\"baseline_mean=\", r1.baseline_mean, \" fault_mean=\", r1.fault_mean, \" diff=\", diff_means, \" DELTA_L=\", DELTA_L)\n",
+    "println(\"correlation r=\", r1.r)\n",
+    "println(\"EQ_metric: \", EQ_m_1_2, \" \", EQ_m_1_4, \" \", EQ_m_1_3, \" \", EQ_m_2_4)\n",
+    "println(\"EQ_log: \", EQ_l_1_2, \" \", EQ_l_1_4, \" \", EQ_l_1_3, \" \", EQ_l_2_4)\n",
+    "\n",
+    "ratio = diff_means / DELTA_L\n",
+    "PASS = EQ_m_1_2 && EQ_m_1_4 && !EQ_m_1_3 && EQ_m_2_4 &&\n",
+    "       EQ_l_1_2 && EQ_l_1_4 && EQ_l_1_3 && EQ_l_2_4 &&\n",
+    "       0.8 <= ratio <= 1.2 && r1.r > 0.7\n",
+    "println(\"PASS=\", PASS)"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Скрипт обработки (delivery script)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "8e610a7d",
+   "cell_type": "markdown",
+   "source": [
+    "## 15. Контрольные вопросы\n",
+    "\n",
+    "- В чём различие диагностической роли метрик, журналов и трасс в наблюдаемости системы?\n",
+    "\n",
+    "- Почему журнал событий в данной модели не меняется при смене seed шума метрики?\n",
+    "\n",
+    "- Что показывает разность fault_mean − baseline_mean и как она связана с параметром ΔL модели?\n",
+    "\n",
+    "- Что измеряет коэффициент корреляции между метрикой и индикатором события журнала?\n",
+    "\n",
+    "- Почему корреляция сама по себе не доказывает причинно-следственную связь?\n",
+    "\n",
+    "- Как изменится сила корреляции r при увеличении отношения ΔL/σ?\n",
+    "\n",
+    "- Почему одинаковый seed должен воспроизводить полный массив метрики, но не обязан затрагивать журнал?\n",
+    "\n",
+    "- Какое упрощение сделано в модели относительно реальной связи журнала и метрики?\n",
+    "\n",
+    "- Почему трассировка отдельных запросов не смоделирована явно в этой работе?\n",
+    "\n",
+    "- Как можно было бы расширить модель для проверки нескольких конкурирующих гипотез о причине аномалии метрики?"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Контрольные вопросы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "0d04782f",
+   "cell_type": "markdown",
+   "source": [
+    "## Раздел для преподавателя: демонстрационный вариант\n",
+    "\n",
+    "Вариант 1 зарезервирован исключительно для демонстрационного прогона и не выдаётся студентам как расчётный (раздел 6). Приведённый ниже прогон подтверждает, что комплект работоспособен целиком: модель фактически создана и соединена в Engee, доставляемый скрипт фактически выполнен в этой среде без ошибок, а результат прошёл все заранее заданные критерии приёмки.\n",
+    "\n",
+    "Ход выполнения:\n",
+    "\n",
+    "- модель LR13_metrics_logs_traces создана программно (engee.create) и заполнена блоками Constant, Random Number, Pulse Generator, Add (3 входа) и двумя To Workspace;\n",
+    "\n",
+    "- блок Pulse Generator (событие/журнал) соединён линиями (engee.add_line) одновременно с сумматором метрики и с выходом журнала — это гарантирует синхронность события и отклонения метрики; шаг решателя (Fixed step) установлен равным шагу дискретизации блоков (0,01 с); модель сохранена и экспортирована в LR13_metrics_logs_traces.engee;\n",
+    "\n",
+    "- при первой проверке критериев обнаружена ошибка в собственной логике приёмки скрипта: ожидалось, что журнал log_fault_signal изменится при смене seed (как и метрика), тогда как журнал формируется детерминированным блоком Pulse Generator и не зависит от seed блока Random Number — критерий исправлен на ожидание совпадения журнала при ЛЮБОМ seed, скрипт LR13_metrics_logs_traces.jl перезаписан и повторно проверен;\n",
+    "\n",
+    "- скрипт LR13_metrics_logs_traces.jl выполнен целиком через include() непосредственно в среде Engee 26.8.2-H3 без ошибок;\n",
+    "\n",
+    "- скрипт выполнил четыре запуска модели (seed 101, 101, 1101, 101), для каждого вычислил baseline_mean, fault_mean, их разность и коэффициент корреляции с журналом событий, сравнил полные массивы метрики и журнала по отдельности и проверил численные критерии раздела 5.4;\n",
+    "\n",
+    "- после проверки вариант 1 восстановлен (Seed = 101), модель повторно сохранена.\n",
+    "\n",
+    "Фактический вывод скрипта (консоль Engee, после исправления критерия):\n",
+    "\n",
+    "baseline_mean=20.05100712002878 fault_mean=35.081978179136826 diff=15.030971059108047 DELTA_L=15.0\n",
+    "correlation r=0.9466743940785464\n",
+    "EQ_metric: true true false true\n",
+    "EQ_log: true true true true\n",
+    "PASS=true\n",
+    "\n",
+    "| Величина | Значение |\n",
+    "|---|---|\n",
+    "| N (оба выхода) | 2000 |\n",
+    "| baseline_mean | 20,051 |\n",
+    "| fault_mean | 35,082 |\n",
+    "| diff (≈ ΔL) | 15,031 |\n",
+    "| корреляция r | 0,947 |\n",
+    "\n",
+    "Проверка воспроизводимости:\n",
+    "\n",
+    "EQ_metric: true true false true   (метрика меняется с seed — ожидаемо)\n",
+    "EQ_log:    true true true  true   (журнал детерминирован — ожидаемо)\n",
+    "PASS: модель и критерии варианта 1 проверены; параметры восстановлены\n",
+    "\n",
+    "Результат демонстрационного прогона наглядно иллюстрирует принцип корреляции метрик и журналов (лекция 14): зафиксированное в журнале событие статистически объясняет практически всю аномалию метрики (diff ≈ ΔL с точностью до 0,2 %, r ≈ 0,95). Это подтверждает, что комплект LR13_metrics_logs_traces может быть выдан студентам в текущем виде."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Демонстрационный вариант (для преподавателя)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  }
+ ]
+}

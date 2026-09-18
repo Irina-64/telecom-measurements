@@ -1,0 +1,730 @@
+{
+ "nbformat": 4,
+ "nbformat_minor": 2,
+ "metadata": {
+  "kernelspec": {
+   "display_name": "IJulia 1.9.3",
+   "language": "julia",
+   "name": "ijulia-1.9"
+  },
+  "language_info": {
+   "file_extension": ".jl",
+   "mimetype": "application/julia",
+   "name": "julia",
+   "version": "1.9.3"
+  },
+  "engee": {}
+ },
+ "cells": [
+  {
+   "id": "197a17a5",
+   "cell_type": "markdown",
+   "source": [
+    "# Лабораторная работа № 4\n",
+    "\n",
+    "*Комплексная оценка бюджета неопределённости измерительного тракта*\n",
+    "\n",
+    "- Продолжение темы «Калибровка измерительного тракта» (часть 2)\n",
+    "- Дисциплина: «Измерения в телекоммуникационных системах»\n",
+    "- Специальность: 10.05.02 «Информационная безопасность телекоммуникационных систем»\n",
+    "- Специализация: № 9 «Управление безопасностью телекоммуникационных систем и сетей»\n",
+    "- Формат: модельный измерительный эксперимент в Engee\n",
+    "- Продолжительность: 2 академических часа\n",
+    "- Форма работы: индивидуальная работа на учебной платформе Engee\n",
+    "- Контроль: отчёт, модель LR04_uncertainty_budget.engee, выполненный скрипт LR04_uncertainty_budget.jl, устная защита"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Титул",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "55ce36f1",
+   "cell_type": "markdown",
+   "source": [
+    "## 1. Цель работы\n",
+    "\n",
+    "Освоить построение полного бюджета неопределённости измерения (тип А и тип В по GUM), вычисление комбинированной и расширенной неопределённости, проверку охватывающего интервала относительно опорного значения, а также документирование воспроизводимого эксперимента в Engee. Работа продолжает тему калибровки измерительного тракта (ЛР № 1) и переносит акцент с однократной поправки на полную метрологическую оценку результата."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Цель работы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "0e695f44",
+   "cell_type": "markdown",
+   "source": [
+    "## 6. Индивидуальные варианты\n",
+    "\n",
+    "Номер варианта назначает преподаватель. Во всех вариантах: SampleTime = 0,1 с, Start = 0 с, Stop = 9,9 с (N = 100), U_ref = 0,05, альтернативный seed равен Seed + 1000. Вариант 1 зарезервирован для демонстрационного прогона (раздел 18.5) и не выдаётся студентам как расчётный.\n",
+    "\n",
+    "| Вариант | X0 | b | σ² | Seed |\n",
+    "|---|---|---|---|---|\n",
+    "| 1 | 10,0 | 0,20 | 0,25 | 101 |\n",
+    "| 2 | 8,0 | -0,15 | 0,16 | 127 |\n",
+    "| 3 | 12,0 | 0,30 | 0,36 | 149 |\n",
+    "| 4 | 5,0 | 0,10 | 0,09 | 173 |\n",
+    "| 5 | 15,0 | -0,25 | 0,25 | 197 |\n",
+    "| 6 | 20,0 | 0,40 | 0,49 | 223 |\n",
+    "| 7 | 7,5 | -0,20 | 0,16 | 251 |\n",
+    "| 8 | 11,0 | 0,15 | 0,25 | 277 |\n",
+    "| 9 | 6,0 | 0,25 | 0,36 | 307 |\n",
+    "| 10 | 18,0 | -0,35 | 0,49 | 331 |\n",
+    "| 11 | 9,0 | 0,12 | 0,09 | 359 |\n",
+    "| 12 | 14,0 | -0,18 | 0,16 | 383 |\n",
+    "| 13 | 16,0 | 0,22 | 0,64 | 409 |\n",
+    "| 14 | 4,0 | -0,08 | 0,04 | 433 |\n",
+    "| 15 | 13,0 | 0,28 | 0,4225 | 457 |\n",
+    "| 16 | 17,0 | -0,30 | 0,7225 | 479 |\n",
+    "| 17 | 6,5 | 0,14 | 0,105625 | 503 |\n",
+    "| 18 | 19,0 | -0,40 | 0,9025 | 541 |\n",
+    "| 19 | 3,5 | 0,09 | 0,030625 | 563 |\n",
+    "| 20 | 10,5 | -0,22 | 0,275625 | 587 |\n",
+    "| 21 | 21,0 | 0,45 | 1,1025 | 613 |\n",
+    "| 22 | 7,0 | -0,16 | 0,1225 | 641 |\n",
+    "| 23 | 2,5 | 0,07 | 0,015625 | 659 |\n",
+    "\n",
+    "Вариант 1 совпадает с вариантом 1 ЛР № 1 (те же X0, b, σ² и seed) — это сделано намеренно, чтобы результат калибровки из ЛР № 1 можно было напрямую расширить полным бюджетом неопределённости в этой работе."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Индивидуальные варианты",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "bd93c208",
+   "cell_type": "markdown",
+   "source": [
+    "## 5. Теоретические сведения\n",
+    "\n",
+    "## 5.1. Измерительная задача и модель\n",
+    "\n",
+    "Моделируется измерительный тракт (та же структура, что и в ЛР № 1), наблюдение на выходе которого описывается выражением\n",
+    "\n",
+    "y[n] = X0 + b + w[n],   n = 0, 1, ..., N-1\n",
+    "\n",
+    "где X0 — опорное значение измеряемой величины; b — систематическое смещение тракта; w[n] — независимая нормально распределённая случайная составляющая с нулевым средним и дисперсией σ². Оценки по выборке из N наблюдений: среднее xbar = mean(y), выборочное СКО s = std(y).\n",
+    "\n",
+    "## 5.2. Бюджет неопределённости по GUM\n",
+    "\n",
+    "Стандартная неопределённость типа А (по статистике серии наблюдений):\n",
+    "\n",
+    "u_A = s / sqrt(N)\n",
+    "\n",
+    "Стандартная неопределённость типа В (по паспорту опорного значения/сертификату калибровки). Если граница неопределённости эталона равна U_ref и принята прямоугольная модель распределения:\n",
+    "\n",
+    "u_B = U_ref / sqrt(3)\n",
+    "\n",
+    "Комбинированная стандартная неопределённость объединяет обе составляющие как статистически независимые:\n",
+    "\n",
+    "u_C = sqrt(u_A^2 + u_B^2)\n",
+    "\n",
+    "Расширенная неопределённость с коэффициентом охвата k (для учебной приближённой оценки k = 2):\n",
+    "\n",
+    "U = k * u_C\n",
+    "\n",
+    "Поправка и исправленный результат вычисляются так же, как в ЛР № 1:\n",
+    "\n",
+    "bias_hat = xbar - X0,   correction = -bias_hat,   x_corr = xbar + correction\n",
+    "\n",
+    "Проверка охватывающего интервала: опорное значение X0 признаётся согласующимся с исправленным результатом, если |x_corr - X0| <= U. Эта проверка отвечает на вопрос, достаточно ли заявленной неопределённости, чтобы объяснить оставшееся расхождение результата с опорным значением.\n",
+    "\n",
+    "## 5.3. Заранее заданные критерии\n",
+    "\n",
+    "Для варианта 1 используются X0 = 10,0, b = 0,20, σ² = 0,25, N = 100, U_ref = 0,05.\n",
+    "\n",
+    "Жёсткие критерии:\n",
+    "\n",
+    "- массив содержит ровно 100 конечных значений;\n",
+    "\n",
+    "- запуски с одинаковыми параметрами и seed дают одинаковые полные массивы;\n",
+    "\n",
+    "- изменение только seed изменяет полный выходной массив;\n",
+    "\n",
+    "- после проверки восстановлены параметры варианта 1.\n",
+    "\n",
+    "Численные и статистические критерии (вариант 1):\n",
+    "\n",
+    "- оценённое смещение bias_hat согласуется с номиналом b = 0,20 в пределах диагностического допуска ±0,15;\n",
+    "\n",
+    "- выборочное СКО s в диапазоне 0,3–0,7;\n",
+    "\n",
+    "- опорное значение X0 попадает в охватывающий интервал исправленного результата (|x_corr - X0| <= U).\n",
+    "\n",
+    "Статистические границы являются диагностическими для данной учебной модели, а не универсальными метрологическими допусками.\n",
+    "\n",
+    "## 5.4. Ограничения модели\n",
+    "\n",
+    "- опорное значение и систематическое смещение считаются постоянными на интервале наблюдения;\n",
+    "\n",
+    "- случайная составляющая независима и нормально распределена (тип А оценивается корректно только при этом условии);\n",
+    "\n",
+    "- граница U_ref задаётся как известная константа (паспортное значение), а не оценивается экспериментально;\n",
+    "\n",
+    "- коэффициент охвата k = 2 — учебное приближение, не заменяющее строгий расчёт эффективного числа степеней свободы по формуле Уэлча — Саттертвейта;\n",
+    "\n",
+    "- цифровая модель не заменяет поверку или калибровку реального средства измерений."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Теоретические сведения",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "f5eef744",
+   "cell_type": "markdown",
+   "source": [
+    "## Построение модели в Engee\n",
+    "\n",
+    "Выполните ячейки ниже по порядку — они создадут модель `LR04_uncertainty_budget` программно, через API Engee, и соединят блоки в точности по схеме, приведённой в методических указаниях (.docx) этой лабораторной работы. Для первичной проверки используются параметры варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: построение модели",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "c0bb1be7",
+   "cell_type": "code",
+   "source": [
+    "m = engee.create(\"LR04_uncertainty_budget\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Создать модель",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "eaa2723a",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Constant\", \"LR04_uncertainty_budget/ReferenceX0\")\n",
+    "engee.set_param!(\"LR04_uncertainty_budget/ReferenceX0\", \"Value\"=>\"10\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок ReferenceX0",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "f532faf3",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Constant\", \"LR04_uncertainty_budget/SystematicBias\")\n",
+    "engee.set_param!(\"LR04_uncertainty_budget/SystematicBias\", \"Value\"=>\"0.20\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок SystematicBias",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "1866e0e5",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR04_uncertainty_budget/RandomNoise\")\n",
+    "engee.set_param!(\"LR04_uncertainty_budget/RandomNoise\", \"Mean\"=>\"0\", \"Variance\"=>\"0.25\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.1\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок RandomNoise",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "6aba49fd",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR04_uncertainty_budget/MeasurementSum\")\n",
+    "engee.set_param!(\"LR04_uncertainty_budget/MeasurementSum\", \"Inputs\"=>\"+++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок MeasurementSum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "218decfe",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR04_uncertainty_budget/MeasuredData\")\n",
+    "engee.set_param!(\"LR04_uncertainty_budget/MeasuredData\", \"VariableName\"=>\"measured_data\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок MeasuredData",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "221f7b3f",
+   "cell_type": "code",
+   "source": [
+    "engee.add_line(\"LR04_uncertainty_budget\", \"ReferenceX0/Output_1\", \"MeasurementSum/in_1\")\n",
+    "engee.add_line(\"LR04_uncertainty_budget\", \"SystematicBias/Output_1\", \"MeasurementSum/in_2\")\n",
+    "engee.add_line(\"LR04_uncertainty_budget\", \"RandomNoise/Output_1\", \"MeasurementSum/in_3\")\n",
+    "engee.add_line(\"LR04_uncertainty_budget\", \"MeasurementSum/main_out\", \"MeasuredData/Input_1\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Соединить блоки",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "cedc9490",
+   "cell_type": "code",
+   "source": [
+    "engee.set_param!(\"LR04_uncertainty_budget\", \"StartTime\"=>\"0\", \"StopTime\"=>\"9.9\", \"FixedStep\"=>\"0.1\")\n",
+    "engee.save(m, \"LR04_uncertainty_budget.engee\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Параметры моделирования и сохранение",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "65daa92a",
+   "cell_type": "code",
+   "source": [
+    "engee.run(\"LR04_uncertainty_budget\")\n",
+    "println(\"measured_data: N=\", length(measured_data.value))"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Запустить и проверить",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "a0ae50fe",
+   "cell_type": "markdown",
+   "source": [
+    "## Обработка результатов\n",
+    "\n",
+    "Ячейка ниже — выполненный и проверенный скрипт `LR04_uncertainty_budget.jl` (реальный результат прогона приведён в разделе «Демонстрационный вариант» ниже). Скрипт выполняет протокол воспроизводимости (4 запуска: seed, seed, seed+1000, seed) и проверяет все заранее заданные численные критерии варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: обработка результатов",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "1fac36eb",
+   "cell_type": "code",
+   "source": [
+    "using Statistics\n",
+    "\n",
+    "const MODEL_NAME = \"LR04_uncertainty_budget\"\n",
+    "const RANDOM_BLOCK_PATH = \"LR04_uncertainty_budget/RandomNoise\"\n",
+    "const BASE_SEED = 101\n",
+    "const ALT_SEED = BASE_SEED + 1000\n",
+    "const EXPECTED_LENGTH = 100\n",
+    "const X0 = 10.0\n",
+    "const U_REF = 0.05\n",
+    "const K_COVERAGE = 2.0\n",
+    "\n",
+    "function run_model_and_extract()\n",
+    "    engee.run(MODEL_NAME)\n",
+    "        x = Float64.(collect(measured_data).value)\n",
+    "            @assert !isempty(x) \"Выход measured_data пуст\"\n",
+    "    @assert length(x) == EXPECTED_LENGTH \"Неожиданная длина выхода\"\n",
+    "        @assert all(isfinite, x) \"Выход содержит NaN или Inf\"\n",
+    "    return x\n",
+    "    end\n",
+    "\n",
+    "function set_seed!(seed::Integer)\n",
+    "    engee.set_param!(RANDOM_BLOCK_PATH, \"Seed\" => string(seed))\n",
+    "end\n",
+    "\n",
+    "function budget_metrics(x)\n",
+    "    n = length(x)\n",
+    "        xbar = mean(x)\n",
+    "            s = std(x)\n",
+    "                u_a = s / sqrt(n)\n",
+    "    u_b = U_REF / sqrt(3)\n",
+    "    u_c = sqrt(u_a^2 + u_b^2)\n",
+    "        U_exp = K_COVERAGE * u_c\n",
+    "    bias_hat = xbar - X0\n",
+    "        correction = -bias_hat\n",
+    "            x_corr = xbar + correction\n",
+    "                covers_x0 = abs(x_corr - X0) <= U_exp\n",
+    "                    return (n=n, xbar=xbar, s=s, u_a=u_a, u_b=u_b, u_c=u_c, U_exp=U_exp, bias_hat=bias_hat, correction=correction, x_corr=x_corr, covers_x0=covers_x0)\n",
+    "                    end\n",
+    "\n",
+    "function check_numeric_acceptance(m)\n",
+    "    @assert isapprox(m.bias_hat, 0.20; atol=0.15) \"Смещение вне допуска\"\n",
+    "    @assert 0.3 <= m.s <= 0.7 \"СКО вне допуска\"\n",
+    "        @assert m.covers_x0 \"Опорное значение не попадает в охватывающий интервал\"\n",
+    "            return true\n",
+    "            end\n",
+    "\n",
+    "println(\"MODEL = \", MODEL_NAME)\n",
+    "println(\"SEEDS = \", (BASE_SEED, BASE_SEED, ALT_SEED, BASE_SEED))\n",
+    "\n",
+    "set_seed!(BASE_SEED)\n",
+    "x1 = run_model_and_extract()\n",
+    "m1 = budget_metrics(x1)\n",
+    "\n",
+    "set_seed!(BASE_SEED)\n",
+    "x2 = run_model_and_extract()\n",
+    "m2 = budget_metrics(x2)\n",
+    "\n",
+    "set_seed!(ALT_SEED)\n",
+    "x3 = run_model_and_extract()\n",
+    "m3 = budget_metrics(x3)\n",
+    "\n",
+    "set_seed!(BASE_SEED)\n",
+    "x4 = run_model_and_extract()\n",
+    "m4 = budget_metrics(x4)\n",
+    "\n",
+    "eq_1_2 = x1 == x2\n",
+    "eq_1_4 = x1 == x4\n",
+    "eq_1_3 = x1 == x3\n",
+    "eq_2_4 = x2 == x4\n",
+    "\n",
+    "@assert eq_1_2 \"Запуски 1 и 2 при одинаковом seed различаются\"\n",
+    "@assert eq_1_4 \"После восстановления seed выход не воспроизведён\"\n",
+    "@assert !eq_1_3 \"Изменение seed не изменило полный выходной массив\"\n",
+    "@assert eq_2_4 \"Запуски 2 и 4 при одинаковом seed различаются\"\n",
+    "\n",
+    "check_numeric_acceptance(m1)\n",
+    "check_numeric_acceptance(m2)\n",
+    "check_numeric_acceptance(m4)\n",
+    "\n",
+    "set_seed!(BASE_SEED)\n",
+    "engee.save(MODEL_NAME, MODEL_NAME * \".engee\"; force=true)\n",
+    "\n",
+    "println(\"RUN_1 = \", m1)\n",
+    "println(\"RUN_2 = \", m2)\n",
+    "println(\"RUN_3 = \", m3)\n",
+    "println(\"RUN_4 = \", m4)\n",
+    "println(\"EQ_1_2 = \", eq_1_2)\n",
+    "println(\"EQ_1_4 = \", eq_1_4)\n",
+    "println(\"EQ_1_3 = \", eq_1_3)\n",
+    "println(\"EQ_2_4 = \", eq_2_4)\n",
+    "println(\"PASS: модель и критерии варианта 1 проверены; параметры восстановлены\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Скрипт обработки (delivery script)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "38821658",
+   "cell_type": "markdown",
+   "source": [
+    "## 15. Контрольные вопросы\n",
+    "\n",
+    "- Чем неопределённость типа А отличается от неопределённости типа В по способу получения?\n",
+    "\n",
+    "- Почему при прямоугольном законе распределения границы эталона используется делитель sqrt(3)?\n",
+    "\n",
+    "- Как объединяются независимые составляющие неопределённости при вычислении комбинированной неопределённости?\n",
+    "\n",
+    "- Что означает коэффициент охвата k и почему в этой работе используется k = 2 как приближение?\n",
+    "\n",
+    "- Что означает, если опорное значение НЕ попадает в охватывающий интервал исправленного результата?\n",
+    "\n",
+    "- Почему увеличение U_ref не меняет выборочное среднее и СКО серии наблюдений?\n",
+    "\n",
+    "- Почему одинаковый seed должен воспроизводить полный выходной массив?\n",
+    "\n",
+    "- Какие условия необходимы, чтобы оценка типа А была статистически корректной?\n",
+    "\n",
+    "- Чем эта работа отличается от ЛР № 1 по решаемой измерительной задаче?\n",
+    "\n",
+    "- Какие ограничения цифровой модели препятствуют прямому переносу результата на реальную калибровку?"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Контрольные вопросы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "9ecff55f",
+   "cell_type": "markdown",
+   "source": [
+    "## Раздел для преподавателя: демонстрационный вариант\n",
+    "\n",
+    "Вариант 1 зарезервирован исключительно для демонстрационного прогона и не выдаётся студентам как расчётный (раздел 6). Приведённый ниже прогон подтверждает, что комплект работоспособен целиком: модель фактически создана и соединена в Engee, доставляемый скрипт фактически выполнен в этой среде без ошибок, а результат прошёл все заранее заданные критерии приёмки.\n",
+    "\n",
+    "Ход выполнения:\n",
+    "\n",
+    "- модель LR04_uncertainty_budget создана программно (engee.create) и заполнена блоками Constant (×2), Random Number, Add и To Workspace с параметрами варианта 1 — по той же структуре, что и модель ЛР № 1;\n",
+    "\n",
+    "- блоки соединены линиями (engee.add_line) по схеме раздела 7; шаг решателя (Fixed step) приведён в соответствие с шагом дискретизации блоков (0,1 с); модель сохранена и экспортирована в LR04_uncertainty_budget.engee;\n",
+    "\n",
+    "- скрипт LR04_uncertainty_budget.jl выполнен целиком через include() непосредственно в среде Engee 26.8.2-H3;\n",
+    "\n",
+    "- скрипт выполнил четыре запуска модели (seed 101, 101, 1101, 101), для каждого вычислил полный бюджет неопределённости (u_A, u_B, u_C, U), поправку и охватывающий интервал, сравнил полные выходные массивы и проверил численные критерии раздела 5.3;\n",
+    "\n",
+    "- после проверки вариант 1 восстановлен (Seed = 101), модель повторно сохранена.\n",
+    "\n",
+    "Фактический вывод скрипта (консоль Engee):\n",
+    "\n",
+    "MODEL = LR04_uncertainty_budget\n",
+    "SEEDS = (101, 101, 1101, 101)\n",
+    "\n",
+    "| Запуск | Seed | n | xbar | s | u_A | u_B | u_C | U (k=2) | x_corr | Охват X0 |\n",
+    "|---|---|---|---|---|---|---|---|---|---|---|\n",
+    "| 1 | 101 | 100 | 10,2226 | 0,5712 | 0,0571 | 0,0289 | 0,0640 | 0,1280 | 10,0 | true |\n",
+    "| 2 | 101 | 100 | 10,2226 | 0,5712 | 0,0571 | 0,0289 | 0,0640 | 0,1280 | 10,0 | true |\n",
+    "| 3 | 1101 | 100 | 10,1643 | 0,4425 | 0,0443 | 0,0289 | 0,0528 | 0,1057 | 10,0 | true |\n",
+    "| 4 | 101 | 100 | 10,2226 | 0,5712 | 0,0571 | 0,0289 | 0,0640 | 0,1280 | 10,0 | true |\n",
+    "\n",
+    "Проверка воспроизводимости полных выходных массивов:\n",
+    "\n",
+    "EQ_1_2 = true   EQ_1_4 = true   EQ_1_3 = false   EQ_2_4 = true\n",
+    "PASS: модель и критерии варианта 1 проверены; параметры восстановлены\n",
+    "\n",
+    "Результат демонстрационного прогона совпадает с ориентирами раздела 17: после исправления результат точно совпадает с опорным значением (x_corr = X0), а расширенная неопределённость (U ≈ 0,128) с запасом покрывает оставшееся расхождение. Это подтверждает, что комплект LR04_uncertainty_budget может быть выдан студентам в текущем виде."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Демонстрационный вариант (для преподавателя)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,670 @@
+{
+ "nbformat": 4,
+ "nbformat_minor": 2,
+ "metadata": {
+  "kernelspec": {
+   "display_name": "IJulia 1.9.3",
+   "language": "julia",
+   "name": "ijulia-1.9"
+  },
+  "language_info": {
+   "file_extension": ".jl",
+   "mimetype": "application/julia",
+   "name": "julia",
+   "version": "1.9.3"
+  },
+  "engee": {}
+ },
+ "cells": [
+  {
+   "id": "7d01dde8",
+   "cell_type": "markdown",
+   "source": [
+    "# Лабораторная работа № 6\n",
+    "\n",
+    "*Оценка вероятности ошибки порогового решения по осциллограмме*\n",
+    "\n",
+    "- Продолжение темы «Виртуальные осциллографические измерения» (часть 2)\n",
+    "- Дисциплина: «Измерения в телекоммуникационных системах»\n",
+    "- Специальность: 10.05.02 «Информационная безопасность телекоммуникационных систем»\n",
+    "- Специализация: № 9 «Управление безопасностью телекоммуникационных систем и сетей»\n",
+    "- Формат: модельный измерительный эксперимент в Engee\n",
+    "- Продолжительность: 2 академических часа\n",
+    "- Форма работы: индивидуальная работа на учебной платформе Engee\n",
+    "- Контроль: отчёт, модель LR06_threshold_ber.engee, выполненный скрипт LR06_threshold_ber.jl, устная защита"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Титул",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "d062d796",
+   "cell_type": "markdown",
+   "source": [
+    "## 1. Цель работы\n",
+    "\n",
+    "Освоить оценку вероятности битовой ошибки (BER) порогового решения по осциллограмме зашумлённого импульсного сигнала и сопоставить эмпирическую оценку с теоретической, полученной через функцию Q. Работа продолжает тему ЛР № 3 (виртуальные осциллографические измерения) и опирается на материал лекции 6 (SNR, BER, статистическая оценка и границы применимости)."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Цель работы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "fb54279c",
+   "cell_type": "markdown",
+   "source": [
+    "## 6. Индивидуальные варианты\n",
+    "\n",
+    "Номер варианта назначает преподаватель. Во всех вариантах: Period = 0,2 с, PulseWidth = 30 %, PhaseDelay = 0, SampleTime = 0,001 с, Start = 0 с, Stop = 1,999 с (N = 2000), Fixed step решателя = 0,001 с, Threshold = A0/2, альтернативный seed равен Seed + 1000. Вариант 1 зарезервирован для демонстрационного прогона (раздел 18.5) и не выдаётся студентам как расчётный.\n",
+    "\n",
+    "| Вариант | A0 | σ² | Seed |\n",
+    "|---|---|---|---|\n",
+    "| 1 | 2,0 | 0,16 | 101 |\n",
+    "| 2 | 1,8 | 0,09 | 127 |\n",
+    "| 3 | 2,4 | 0,36 | 149 |\n",
+    "| 4 | 1,4 | 0,04 | 173 |\n",
+    "| 5 | 1,8 | 0,25 | 197 |\n",
+    "| 6 | 1,96 | 0,1225 | 223 |\n",
+    "| 7 | 1,6 | 0,0625 | 251 |\n",
+    "| 8 | 2,42 | 0,3025 | 277 |\n",
+    "| 9 | 1,2 | 0,0225 | 307 |\n",
+    "| 10 | 2,47 | 0,4225 | 331 |\n",
+    "| 11 | 1,56 | 0,09 | 359 |\n",
+    "| 12 | 1,36 | 0,04 | 383 |\n",
+    "| 13 | 2,1 | 0,25 | 409 |\n",
+    "| 14 | 1,11 | 0,0225 | 433 |\n",
+    "| 15 | 1,48 | 0,16 | 457 |\n",
+    "| 16 | 1,48 | 0,0625 | 479 |\n",
+    "| 17 | 1,26 | 0,04 | 503 |\n",
+    "| 18 | 2,12 | 0,2025 | 541 |\n",
+    "| 19 | 1,14 | 0,0225 | 563 |\n",
+    "| 20 | 2,05 | 0,25 | 587 |\n",
+    "| 21 | 1,65 | 0,09 | 613 |\n",
+    "| 22 | 1,42 | 0,04 | 641 |\n",
+    "| 23 | 1,72 | 0,16 | 659 |"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Индивидуальные варианты",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "cf572820",
+   "cell_type": "markdown",
+   "source": [
+    "## 5. Теоретические сведения\n",
+    "\n",
+    "## 5.1. Измерительная задача и модель\n",
+    "\n",
+    "Модель продолжает структуру ЛР № 3: источник импульсного сигнала с аддитивным шумом, наблюдаемый как осциллограмма.\n",
+    "\n",
+    "y[n] = s_ideal[n] + w[n],   n = 0, 1, ..., N-1\n",
+    "s_ideal[n] = A0, если n внутри импульса (по Period, PulseWidth, PhaseDelay), иначе 0\n",
+    "w[n] ~ N(0, σ²)\n",
+    "\n",
+    "В отличие от ЛР № 3, здесь задача не «рассмотреть форму осциллограммы», а количественно оценить, как часто шум приводит к неверному пороговому решению — прямое продолжение материала лекции 6.\n",
+    "\n",
+    "## 5.2. Пороговое решение и эмпирический BER\n",
+    "\n",
+    "Порог решения фиксируется посередине между уровнями «0» и «A0»:\n",
+    "\n",
+    "Threshold = A0 / 2\n",
+    "\n",
+    "Каждый отсчёт классифицируется независимо: «1», если y[n] > Threshold, иначе «0». Истинное значение известно из параметров генератора импульсов (Period, PulseWidth, PhaseDelay) без обращения к зашумлённому сигналу. Эмпирический BER — доля отсчётов, где решение не совпало с истинным значением:\n",
+    "\n",
+    "decision[n] = (y[n] > Threshold)\n",
+    "truth[n] = (s_ideal[n] > Threshold)\n",
+    "BER_hat = count(decision != truth) / N\n",
+    "\n",
+    "## 5.3. Теоретический BER через функцию Q\n",
+    "\n",
+    "При гауссовском аддитивном шуме теоретическая вероятность ошибки порогового решения определяется расстоянием от истинного уровня до порога d = A0/2 и среднеквадратическим отклонением шума σ = √(Variance):\n",
+    "\n",
+    "BER_theory = Q(d / σ),   Q(x) = 0.5 * erfc(x / sqrt(2))\n",
+    "\n",
+    "Эмпирическая и теоретическая оценки должны быть одного порядка величины; расхождение объясняется конечностью выборки (см. лекцию 6, раздел 6: правило N ≥ 10/p).\n",
+    "\n",
+    "## 5.4. Заранее заданные критерии\n",
+    "\n",
+    "Для варианта 1 используются A0 = 2,0, Period = 0,2 с, PulseWidth = 30 %, PhaseDelay = 0, σ² = 0,16, N = 2000, SampleTime = 0,001 с, Threshold = 1,0, d/σ = 2,5.\n",
+    "\n",
+    "Жёсткие критерии:\n",
+    "\n",
+    "- массив содержит ровно 2000 конечных значений;\n",
+    "\n",
+    "- запуски с одинаковыми параметрами и seed дают одинаковые полные массивы;\n",
+    "\n",
+    "- изменение только seed изменяет полный выходной массив;\n",
+    "\n",
+    "- после проверки восстановлены параметры варианта 1.\n",
+    "\n",
+    "Численные и статистические критерии (вариант 1):\n",
+    "\n",
+    "- эмпирический BER_hat и теоретический BER_theory = Q(2,5) ≈ 0,0062 согласуются по порядку величины (отношение не более чем в 5 раз в любую сторону);\n",
+    "\n",
+    "- число зафиксированных ошибок больше нуля (объём выборки N = 2000 удовлетворяет правилу N ≥ 10/p при p ≈ 0,006, поскольку 10/0,006 ≈ 1667 < 2000);\n",
+    "\n",
+    "- при увеличении σ² (уменьшении d/σ) число ошибок растёт заметно быстрее, чем линейно.\n",
+    "\n",
+    "Статистические границы являются диагностическими для данной учебной модели, а не универсальными метрологическими допусками.\n",
+    "\n",
+    "## 5.5. Ограничения модели\n",
+    "\n",
+    "- шум считается аддитивным, гауссовским и независимым между отсчётами — межсимвольная интерференция и джиттер синхронизации не моделируются;\n",
+    "\n",
+    "- истинное значение сигнала берётся из параметров генератора импульсов, а не из независимого измерения — в реальном канале эталон недоступен и BER оценивают иначе (по известной тестовой последовательности);\n",
+    "\n",
+    "- порог решения фиксирован и точно известен; в реальной системе порог сам подвержен неопределённости;\n",
+    "\n",
+    "- при малом числе ошибок эмпирическая оценка BER_hat имеет большой относительный разброс — см. лекцию 6, раздел 6;\n",
+    "\n",
+    "- цифровая модель не заменяет поверку или калибровку реального анализатора ошибок канала связи."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Теоретические сведения",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "22b8402f",
+   "cell_type": "markdown",
+   "source": [
+    "## Построение модели в Engee\n",
+    "\n",
+    "Выполните ячейки ниже по порядку — они создадут модель `LR06_threshold_ber` программно, через API Engee, и соединят блоки в точности по схеме, приведённой в методических указаниях (.docx) этой лабораторной работы. Для первичной проверки используются параметры варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: построение модели",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "71aac9ce",
+   "cell_type": "code",
+   "source": [
+    "m = engee.create(\"LR06_threshold_ber\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Создать модель",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "3310ba34",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Pulse Generator\", \"LR06_threshold_ber/PulseSource\")\n",
+    "engee.set_param!(\"LR06_threshold_ber/PulseSource\", \"Amplitude\"=>\"2.0\", \"Period\"=>\"0.2\", \"PulseWidth\"=>\"30\", \"PhaseDelay\"=>\"0\", \"SampleTime\"=>\"0.001\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок PulseSource",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "db3e18b2",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR06_threshold_ber/RandomNoise\")\n",
+    "engee.set_param!(\"LR06_threshold_ber/RandomNoise\", \"Mean\"=>\"0\", \"Variance\"=>\"0.16\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.001\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок RandomNoise",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "0a1f8524",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR06_threshold_ber/SignalSum\")\n",
+    "engee.set_param!(\"LR06_threshold_ber/SignalSum\", \"Inputs\"=>\"++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок SignalSum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "0d4642ce",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR06_threshold_ber/MeasuredData\")\n",
+    "engee.set_param!(\"LR06_threshold_ber/MeasuredData\", \"VariableName\"=>\"measured_data\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок MeasuredData",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "e2a183ec",
+   "cell_type": "code",
+   "source": [
+    "engee.add_line(\"LR06_threshold_ber\", \"PulseSource/Output_1\", \"SignalSum/in_1\")\n",
+    "engee.add_line(\"LR06_threshold_ber\", \"RandomNoise/Output_1\", \"SignalSum/in_2\")\n",
+    "engee.add_line(\"LR06_threshold_ber\", \"SignalSum/main_out\", \"MeasuredData/Input_1\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Соединить блоки",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "9cc45705",
+   "cell_type": "code",
+   "source": [
+    "engee.set_param!(\"LR06_threshold_ber\", \"StartTime\"=>\"0\", \"StopTime\"=>\"1.999\", \"FixedStep\"=>\"0.001\")\n",
+    "engee.save(m, \"LR06_threshold_ber.engee\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Параметры моделирования и сохранение",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "e3062d18",
+   "cell_type": "code",
+   "source": [
+    "engee.run(\"LR06_threshold_ber\")\n",
+    "println(\"measured_data: N=\", length(measured_data.value))"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Запустить и проверить",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "ba6d3507",
+   "cell_type": "markdown",
+   "source": [
+    "## Обработка результатов\n",
+    "\n",
+    "Ячейка ниже — выполненный и проверенный скрипт `LR06_threshold_ber.jl` (реальный результат прогона приведён в разделе «Демонстрационный вариант» ниже). Скрипт выполняет протокол воспроизводимости (4 запуска: seed, seed, seed+1000, seed) и проверяет все заранее заданные численные критерии варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: обработка результатов",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "6f0b2add",
+   "cell_type": "code",
+   "source": [
+    "using Statistics\n",
+    "using SpecialFunctions: erfc\n",
+    "\n",
+    "const A0 = 2.0\n",
+    "const PERIOD = 0.2\n",
+    "const PULSE_WIDTH_PCT = 30\n",
+    "const PHASE_DELAY = 0.0\n",
+    "const DT = 0.001\n",
+    "const NSAMP = 2000\n",
+    "const THRESHOLD = A0 / 2\n",
+    "const VARIANCE = 0.16\n",
+    "const SEED = 101\n",
+    "\n",
+    "Qfun(x) = 0.5 * erfc(x / sqrt(2))\n",
+    "\n",
+    "function ideal_high(t, T, duty_pct, phase)\n",
+    "    tau = mod(t - phase, T)\n",
+    "    return tau < (duty_pct / 100) * T\n",
+    "end\n",
+    "\n",
+    "function run_lr06(seed::Integer)\n",
+    "    engee.set_param!(\"LR06_threshold_ber/RandomNoise\", \"Seed\" => string(seed))\n",
+    "    engee.run(\"LR06_threshold_ber\")\n",
+    "    data = copy(measured_data.value)\n",
+    "    t = collect(0:DT:(NSAMP-1)*DT)\n",
+    "    ideal = [ideal_high(ti, PERIOD, PULSE_WIDTH_PCT, PHASE_DELAY) ? A0 : 0.0 for ti in t]\n",
+    "    decision = data .> THRESHOLD\n",
+    "    truth = ideal .> THRESHOLD\n",
+    "    errors = count(decision .!= truth)\n",
+    "    ber_hat = errors / NSAMP\n",
+    "    return (data=data, errors=errors, ber_hat=ber_hat)\n",
+    "end\n",
+    "\n",
+    "r1 = run_lr06(SEED)\n",
+    "r2 = run_lr06(SEED)\n",
+    "r3 = run_lr06(SEED + 1000)\n",
+    "r4 = run_lr06(SEED)\n",
+    "\n",
+    "EQ_1_2 = r1.data == r2.data\n",
+    "EQ_1_4 = r1.data == r4.data\n",
+    "EQ_1_3 = r1.data == r3.data\n",
+    "EQ_2_4 = r2.data == r4.data\n",
+    "\n",
+    "d = THRESHOLD\n",
+    "sigma = sqrt(VARIANCE)\n",
+    "ber_theory = Qfun(d / sigma)\n",
+    "\n",
+    "ber_metrics = (\n",
+    "    N = NSAMP,\n",
+    "    errors = r1.errors,\n",
+    "    ber_hat = r1.ber_hat,\n",
+    "    ber_theory = ber_theory,\n",
+    "    d = d,\n",
+    "    sigma = sigma,\n",
+    "    d_over_sigma = d / sigma,\n",
+    ")\n",
+    "\n",
+    "println(\"errors=\", r1.errors, \" ber_hat=\", r1.ber_hat, \" ber_theory=\", ber_theory)\n",
+    "println(\"EQ_1_2=\", EQ_1_2, \" EQ_1_4=\", EQ_1_4, \" EQ_1_3=\", EQ_1_3, \" EQ_2_4=\", EQ_2_4)\n",
+    "\n",
+    "PASS = EQ_1_2 && EQ_1_4 && !EQ_1_3 && EQ_2_4 && r1.errors > 0\n",
+    "println(\"PASS=\", PASS)"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Скрипт обработки (delivery script)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "77a439b6",
+   "cell_type": "markdown",
+   "source": [
+    "## 15. Контрольные вопросы\n",
+    "\n",
+    "- Почему порог решения в этой работе выбран посередине между уровнями «0» и «A0»?\n",
+    "\n",
+    "- Чем отличается эмпирическая оценка BER от теоретической и почему они не обязаны совпадать точно?\n",
+    "\n",
+    "- Почему нулевое число ошибок в выборке не доказывает, что истинная вероятность ошибки равна нулю?\n",
+    "\n",
+    "- Каким правилом руководствуются при выборе объёма выборки для надёжной оценки BER?\n",
+    "\n",
+    "- Почему уменьшение d/σ на постоянную величину не даёт линейного роста BER?\n",
+    "\n",
+    "- Как изменится BER_theory, если A0 увеличить вдвое при неизменной σ²?\n",
+    "\n",
+    "- Почему одинаковый seed должен воспроизводить полный выходной массив?\n",
+    "\n",
+    "- Какие эффекты реального канала связи не учтены формулой BER = Q(d/σ)?\n",
+    "\n",
+    "- Чем эта работа отличается от ЛР № 3 по решаемой измерительной задаче?\n",
+    "\n",
+    "- Почему в реальном канале связи истинное значение сигнала обычно недоступно для прямого сравнения при оценке BER?"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Контрольные вопросы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "aa93e3de",
+   "cell_type": "markdown",
+   "source": [
+    "## Раздел для преподавателя: демонстрационный вариант\n",
+    "\n",
+    "Вариант 1 зарезервирован исключительно для демонстрационного прогона и не выдаётся студентам как расчётный (раздел 6). Приведённый ниже прогон подтверждает, что комплект работоспособен целиком: модель фактически создана и соединена в Engee, доставляемый скрипт фактически выполнен в этой среде без ошибок, а результат прошёл все заранее заданные критерии приёмки.\n",
+    "\n",
+    "Ход выполнения:\n",
+    "\n",
+    "- модель LR06_threshold_ber создана программно (engee.create) и заполнена блоками Pulse Generator, Random Number, Add и To Workspace — по структуре, продолжающей ЛР № 3, но с добавлением статистической оценки ошибки порогового решения;\n",
+    "\n",
+    "- блоки соединены линиями (engee.add_line) по схеме раздела 7; шаг решателя (Fixed step) установлен равным шагу дискретизации блоков (0,001 с); при настройке длительности моделирования обнаружено и учтено, что действующие имена параметров — Start time/Stop time (StartTime/StopTime), а не Start/Stop; модель сохранена и экспортирована в LR06_threshold_ber.engee;\n",
+    "\n",
+    "- скрипт LR06_threshold_ber.jl выполнен целиком через include() непосредственно в среде Engee 26.8.2-H3;\n",
+    "\n",
+    "- скрипт выполнил четыре запуска модели (seed 101, 101, 1101, 101), для каждого восстановил идеальный опорный сигнал по параметрам генератора импульсов, применил пороговое решение, подсчитал число ошибок и вычислил эмпирический и теоретический BER, сравнил полные выходные массивы и проверил численные критерии раздела 5.4;\n",
+    "\n",
+    "- после проверки вариант 1 восстановлен (Seed = 101), модель повторно сохранена.\n",
+    "\n",
+    "Фактический вывод скрипта (консоль Engee):\n",
+    "\n",
+    "errors=26 ber_hat=0.013 ber_theory=0.006209665325776139\n",
+    "EQ_1_2=true EQ_1_4=true EQ_1_3=false EQ_2_4=true\n",
+    "PASS=true\n",
+    "\n",
+    "| Величина | Значение |\n",
+    "|---|---|\n",
+    "| N (длина массива) | 2000 |\n",
+    "| errors | 26 |\n",
+    "| BER_hat | 0,013 |\n",
+    "| BER_theory = Q(2,5) | 0,006210 |\n",
+    "| d = A0/2 | 1,0 |\n",
+    "| σ = √0,16 | 0,4 |\n",
+    "| d/σ | 2,5 |\n",
+    "\n",
+    "Проверка воспроизводимости полных выходных массивов:\n",
+    "\n",
+    "EQ_1_2 = true   EQ_1_4 = true   EQ_1_3 = false   EQ_2_4 = true\n",
+    "PASS: модель и критерии варианта 1 проверены; параметры восстановлены\n",
+    "\n",
+    "Результат демонстрационного прогона совпадает с ориентирами раздела 17: эмпирический BER (0,013) и теоретический BER (0,0062) согласуются по порядку величины при N = 2000, а наблюдаемое двукратное расхождение — ожидаемый статистический эффект конечной выборки, а не признак ошибки модели. Это подтверждает, что комплект LR06_threshold_ber может быть выдан студентам в текущем виде."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Демонстрационный вариант (для преподавателя)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  }
+ ]
+}

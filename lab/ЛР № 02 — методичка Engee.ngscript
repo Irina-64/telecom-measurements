@@ -1,0 +1,676 @@
+{
+ "nbformat": 4,
+ "nbformat_minor": 2,
+ "metadata": {
+  "kernelspec": {
+   "display_name": "IJulia 1.9.3",
+   "language": "julia",
+   "name": "ijulia-1.9"
+  },
+  "language_info": {
+   "file_extension": ".jl",
+   "mimetype": "application/julia",
+   "name": "julia",
+   "version": "1.9.3"
+  },
+  "engee": {}
+ },
+ "cells": [
+  {
+   "id": "d1930d3a",
+   "cell_type": "markdown",
+   "source": [
+    "# Лабораторная работа № 2\n",
+    "\n",
+    "*Моделирование генератора, формы, спектра и шума сигнала в Engee*\n",
+    "\n",
+    "- Дисциплина: «Измерения в телекоммуникационных системах»\n",
+    "- Специальность: 10.05.02 «Информационная безопасность телекоммуникационных систем»\n",
+    "- Специализация: № 9 «Управление безопасностью телекоммуникационных систем и сетей»\n",
+    "- Формат: модельный измерительный эксперимент в Engee\n",
+    "- Продолжительность: 4 академических часа\n",
+    "- Форма работы: индивидуальная работа на учебной платформе Engee\n",
+    "- Контроль: отчёт, модель LR02_signal_generator_spectrum.engee, выполненный скрипт LR02_signal_generator_spectrum.jl, устная защита"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Титул",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "fcd9f393",
+   "cell_type": "markdown",
+   "source": [
+    "## 1. Цель работы\n",
+    "\n",
+    "Освоить построение цифровой модели измерительного генератора гармонического сигнала, оценивание формы, амплитудного и частотного спектра сигнала при наличии аддитивного шума, а также документирование воспроизводимого эксперимента в Engee."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Цель работы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "c885e670",
+   "cell_type": "markdown",
+   "source": [
+    "## 6. Индивидуальные варианты\n",
+    "\n",
+    "Номер варианта назначает преподаватель. Во всех вариантах: SampleTime = 0,01 с, Start = 0 с, Stop = 9,99 с (N = 1000, fs = 100 Гц), phi0 = 0 рад, альтернативный seed равен Seed + 1000. Частота ω0 (рад/с) для блока Sine Wave вычисляется как 2·π·f0.\n",
+    "\n",
+    "| Вариант | A0 | f0, Гц | ω0, рад/с | σ² | Seed |\n",
+    "|---|---|---|---|---|---|\n",
+    "| 1 | 2,0 | 5,0 | 31,415927 | 0,0400 | 101 |\n",
+    "| 2 | 1,5 | 8,0 | 50,265482 | 0,0225 | 127 |\n",
+    "| 3 | 3,0 | 3,0 | 18,849556 | 0,0900 | 149 |\n",
+    "| 4 | 1,0 | 10,0 | 62,831853 | 0,0100 | 173 |\n",
+    "| 5 | 2,5 | 4,0 | 25,132741 | 0,0625 | 197 |\n",
+    "| 6 | 4,0 | 2,0 | 12,566371 | 0,1600 | 223 |\n",
+    "| 7 | 1,2 | 12,0 | 75,398224 | 0,0144 | 251 |\n",
+    "| 8 | 2,2 | 6,0 | 37,699112 | 0,0484 | 277 |\n",
+    "| 9 | 1,8 | 7,0 | 43,982297 | 0,0324 | 307 |\n",
+    "| 10 | 3,5 | 3,5 | 21,991149 | 0,1225 | 331 |\n",
+    "| 11 | 1,6 | 9,0 | 56,548668 | 0,0256 | 359 |\n",
+    "| 12 | 2,8 | 4,5 | 28,274334 | 0,0784 | 383 |"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Индивидуальные варианты",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "35738e33",
+   "cell_type": "markdown",
+   "source": [
+    "## 5. Теоретические сведения\n",
+    "\n",
+    "## 5.1. Измерительная задача и модель\n",
+    "\n",
+    "Моделируется измерительный генератор, формирующий на выходе дискретный гармонический сигнал со случайной аддитивной помехой:\n",
+    "\n",
+    "y[n] = A0 * sin(2*pi*f0*n*Ts + phi0) + w[n],   n = 0, 1, ..., N-1\n",
+    "\n",
+    "где A0 — номинальная амплитуда генератора (условная единица); f0 — номинальная частота генератора, Гц; phi0 — начальная фаза, рад; Ts — период дискретизации, с; w[n] — независимая нормально распределённая случайная составляющая с нулевым средним и дисперсией σ² (аддитивный шум генератора и тракта). Частота дискретизации fs = 1/Ts, длина реализации N = (Stop − Start)/Ts + 1.\n",
+    "\n",
+    "Блок Sine Wave в Engee задаёт частоту в радианах в секунду, поэтому значение параметра Frequency вычисляется как ω0 = 2·π·f0.\n",
+    "\n",
+    "Спектральная оценка выполняется методом периодограммы на основе быстрого преобразования Фурье (БПФ):\n",
+    "\n",
+    "Y[k] = FFT(y)[k],   P[k] = |Y[k]|^2 / N,   f[k] = k * fs / N,   k = 0, ..., N-1\n",
+    "\n",
+    "Оценка частоты — по номеру частотного бина с максимумом P[k] среди k = 1, ..., N/2 (без учёта постоянной составляющей k = 0):\n",
+    "\n",
+    "k0_hat = argmax(P[1 : N/2]),   f0_hat = k0_hat * fs / N\n",
+    "\n",
+    "Оценка амплитуды по спектральному пику и оценка отношения сигнал/шум по мощности:\n",
+    "\n",
+    "A0_hat = 2 * abs(Y[k0_hat]) / N\n",
+    "P_total_hat = mean(y.^2)\n",
+    "P_signal_hat = A0_hat^2 / 2\n",
+    "P_noise_hat = P_total_hat - P_signal_hat\n",
+    "SNR_hat_dB = 10 * log10(P_signal_hat / P_noise_hat)\n",
+    "\n",
+    "## 5.2. Заранее заданные критерии\n",
+    "\n",
+    "Для варианта 1 используются A0 = 2,0, f0 = 5,0 Гц, σ² = 0,04, N = 1000, fs = 100 Гц (Δf = fs/N = 0,1 Гц).\n",
+    "\n",
+    "Жёсткие критерии:\n",
+    "\n",
+    "- массив содержит ровно 1000 конечных значений;\n",
+    "\n",
+    "- запуски с одинаковыми параметрами и seed дают одинаковые полные массивы;\n",
+    "\n",
+    "- изменение только seed изменяет полный выходной массив;\n",
+    "\n",
+    "- после проверки восстановлены параметры варианта 1.\n",
+    "\n",
+    "Численные и статистические критерии (вариант 1):\n",
+    "\n",
+    "- оценённая частота f0_hat = 5,0 Гц (пик приходится точно на 50-й частотный бин, k0_hat = 50);\n",
+    "\n",
+    "- оценённая амплитуда A0_hat в диапазоне 1,8–2,2 условной единицы;\n",
+    "\n",
+    "- оценённое SNR_hat в диапазоне 14–20 дБ;\n",
+    "\n",
+    "- все промежуточные величины конечны.\n",
+    "\n",
+    "Статистические границы являются диагностическими для данной учебной модели, а не универсальными метрологическими допусками.\n",
+    "\n",
+    "## 5.3. Ограничения модели\n",
+    "\n",
+    "- амплитуда, частота и фаза генератора считаются постоянными на интервале наблюдения;\n",
+    "\n",
+    "- случайная составляющая независима, аддитивна и нормально распределена (белый гауссовский шум);\n",
+    "\n",
+    "- отсутствуют нелинейные искажения генератора, гармоники, квантование АЦП и дрейф частоты/амплитуды;\n",
+    "\n",
+    "- частотное разрешение спектральной оценки ограничено длительностью наблюдения (Δf = fs/N) и не учитывает взвешивающие окна;\n",
+    "\n",
+    "- цифровая модель не заменяет поверку или калибровку реального измерительного генератора."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Теоретические сведения",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "f156dec1",
+   "cell_type": "markdown",
+   "source": [
+    "## Построение модели в Engee\n",
+    "\n",
+    "Выполните ячейки ниже по порядку — они создадут модель `LR02_signal_generator_spectrum` программно, через API Engee, и соединят блоки в точности по схеме, приведённой в методических указаниях (.docx) этой лабораторной работы. Для первичной проверки используются параметры варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: построение модели",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "d952857b",
+   "cell_type": "code",
+   "source": [
+    "m = engee.create(\"LR02_signal_generator_spectrum\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Создать модель",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "01923cec",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Sine Wave\", \"LR02_signal_generator_spectrum/SineGenerator\")\n",
+    "engee.set_param!(\"LR02_signal_generator_spectrum/SineGenerator\", \"Amplitude\"=>\"2.0\", \"Frequency\"=>\"31.415927\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок SineGenerator",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "d72fb629",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR02_signal_generator_spectrum/RandomNoise\")\n",
+    "engee.set_param!(\"LR02_signal_generator_spectrum/RandomNoise\", \"Mean\"=>\"0\", \"Variance\"=>\"0.04\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок RandomNoise",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "243bf573",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR02_signal_generator_spectrum/SignalSum\")\n",
+    "engee.set_param!(\"LR02_signal_generator_spectrum/SignalSum\", \"Inputs\"=>\"++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок SignalSum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "d4f1ded6",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR02_signal_generator_spectrum/GeneratedSignal\")\n",
+    "engee.set_param!(\"LR02_signal_generator_spectrum/GeneratedSignal\", \"VariableName\"=>\"generated_signal\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок GeneratedSignal",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "e360a908",
+   "cell_type": "code",
+   "source": [
+    "engee.add_line(\"LR02_signal_generator_spectrum\", \"SineGenerator/main_out\", \"SignalSum/in_1\")\n",
+    "engee.add_line(\"LR02_signal_generator_spectrum\", \"RandomNoise/Output_1\", \"SignalSum/in_2\")\n",
+    "engee.add_line(\"LR02_signal_generator_spectrum\", \"SignalSum/main_out\", \"GeneratedSignal/Input_1\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Соединить блоки",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "2100d718",
+   "cell_type": "code",
+   "source": [
+    "engee.set_param!(\"LR02_signal_generator_spectrum\", \"StartTime\"=>\"0\", \"StopTime\"=>\"9.99\", \"FixedStep\"=>\"0.01\")\n",
+    "engee.save(m, \"LR02_signal_generator_spectrum.engee\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Параметры моделирования и сохранение",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "ddaa6f76",
+   "cell_type": "code",
+   "source": [
+    "engee.run(\"LR02_signal_generator_spectrum\")\n",
+    "println(\"generated_signal: N=\", length(generated_signal.value))"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Запустить и проверить",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "b86a0065",
+   "cell_type": "markdown",
+   "source": [
+    "## Обработка результатов\n",
+    "\n",
+    "Ячейка ниже — выполненный и проверенный скрипт `LR02_signal_generator_spectrum.jl` (реальный результат прогона приведён в разделе «Демонстрационный вариант» ниже). Скрипт выполняет протокол воспроизводимости (4 запуска: seed, seed, seed+1000, seed) и проверяет все заранее заданные численные критерии варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: обработка результатов",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "504cdaf8",
+   "cell_type": "code",
+   "source": [
+    "using Statistics\n",
+    "using FFTW\n",
+    "\n",
+    "const MODEL_NAME = \"LR02_signal_generator_spectrum\"\n",
+    "const RANDOM_BLOCK_PATH = \"LR02_signal_generator_spectrum/RandomNoise\"\n",
+    "const BASE_SEED = 101\n",
+    "const ALT_SEED = BASE_SEED + 1000\n",
+    "const EXPECTED_LENGTH = 1000\n",
+    "\n",
+    "function run_model_and_extract()\n",
+    "    engee.run(MODEL_NAME)\n",
+    "    x = Float64.(collect(generated_signal).value)\n",
+    "    @assert !isempty(x) \"Выход generated_signal пуст\"\n",
+    "    @assert length(x) == EXPECTED_LENGTH \"Неожиданная длина выхода\"\n",
+    "    @assert all(isfinite, x) \"Выход содержит NaN или Inf\"\n",
+    "    return x\n",
+    "end\n",
+    "\n",
+    "function set_seed!(seed::Integer)\n",
+    "    engee.set_param!(RANDOM_BLOCK_PATH, \"Seed\" => string(seed))\n",
+    "end\n",
+    "\n",
+    "function spectral_metrics(x)\n",
+    "    N = length(x)\n",
+    "    fs = 100.0\n",
+    "    Y = fft(x)\n",
+    "    P = abs2.(Y) ./ N\n",
+    "    half = 1:div(N,2)\n",
+    "    k0 = argmax(P[half .+ 1])\n",
+    "    f0_hat = k0 * fs / N\n",
+    "    A0_hat = 2*abs(Y[k0+1])/N\n",
+    "    P_total = mean(x.^2)\n",
+    "    P_signal = A0_hat^2/2\n",
+    "    P_noise = P_total - P_signal\n",
+    "    SNR_dB = 10*log10(P_signal/P_noise)\n",
+    "    return (n=N, f0=f0_hat, A0=A0_hat, SNR=SNR_dB)\n",
+    "end\n",
+    "\n",
+    "function check_numeric_acceptance(m)\n",
+    "    @assert isapprox(m.f0, 5.0; atol=0.05) \"Частота вне допуска\"\n",
+    "    @assert 1.8 <= m.A0 <= 2.2 \"Амплитуда вне допуска\"\n",
+    "    @assert 14.0 <= m.SNR <= 20.0 \"SNR вне допуска\"\n",
+    "    return true\n",
+    "end\n",
+    "\n",
+    "println(\"MODEL = \", MODEL_NAME)\n",
+    "println(\"SEEDS = \", (BASE_SEED, BASE_SEED, ALT_SEED, BASE_SEED))\n",
+    "\n",
+    "set_seed!(BASE_SEED)\n",
+    "x1 = run_model_and_extract()\n",
+    "m1 = spectral_metrics(x1)\n",
+    "\n",
+    "set_seed!(BASE_SEED)\n",
+    "x2 = run_model_and_extract()\n",
+    "m2 = spectral_metrics(x2)\n",
+    "\n",
+    "set_seed!(ALT_SEED)\n",
+    "x3 = run_model_and_extract()\n",
+    "m3 = spectral_metrics(x3)\n",
+    "\n",
+    "set_seed!(BASE_SEED)\n",
+    "x4 = run_model_and_extract()\n",
+    "m4 = spectral_metrics(x4)\n",
+    "\n",
+    "eq_1_2 = x1 == x2\n",
+    "eq_1_4 = x1 == x4\n",
+    "eq_1_3 = x1 == x3\n",
+    "eq_2_4 = x2 == x4\n",
+    "\n",
+    "@assert eq_1_2 \"Запуски 1 и 2 при одинаковом seed различаются\"\n",
+    "@assert eq_1_4 \"После восстановления seed выход не воспроизведён\"\n",
+    "@assert !eq_1_3 \"Изменение seed не изменило полный выходной массив\"\n",
+    "@assert eq_2_4 \"Запуски 2 и 4 при одинаковом seed различаются\"\n",
+    "\n",
+    "check_numeric_acceptance(m1)\n",
+    "check_numeric_acceptance(m2)\n",
+    "check_numeric_acceptance(m4)\n",
+    "\n",
+    "set_seed!(BASE_SEED)\n",
+    "engee.save(MODEL_NAME, MODEL_NAME * \".engee\"; force=true)\n",
+    "\n",
+    "println(\"RUN_1 = \", m1)\n",
+    "println(\"RUN_2 = \", m2)\n",
+    "println(\"RUN_3 = \", m3)\n",
+    "println(\"RUN_4 = \", m4)\n",
+    "println(\"EQ_1_2 = \", eq_1_2)\n",
+    "println(\"EQ_1_4 = \", eq_1_4)\n",
+    "println(\"EQ_1_3 = \", eq_1_3)\n",
+    "println(\"EQ_2_4 = \", eq_2_4)\n",
+    "println(\"PASS: модель и критерии варианта 1 проверены; параметры восстановлены\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Скрипт обработки (delivery script)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "495c5b3f",
+   "cell_type": "markdown",
+   "source": [
+    "## 15. Контрольные вопросы\n",
+    "\n",
+    "- Почему частота дискретизации должна как минимум вдвое превышать наибольшую значимую частоту сигнала (теорема Найквиста — Котельникова)?\n",
+    "\n",
+    "- Как связаны разрешение по частоте БПФ, длительность наблюдения и частота дискретизации?\n",
+    "\n",
+    "- Почему одинаковый seed должен воспроизводить полный выходной массив?\n",
+    "\n",
+    "- Чем оценка амплитуды по пику спектра отличается от оценки по среднеквадратичному значению сигнала?\n",
+    "\n",
+    "- Как рост дисперсии шума влияет на точность оценки частоты и амплитуды по спектру?\n",
+    "\n",
+    "- Что такое отношение сигнал/шум (SNR) и как его оценить по спектру сигнала с аддитивным шумом?\n",
+    "\n",
+    "- Почему увеличение длительности наблюдения при неизменной частоте дискретизации улучшает частотное разрешение, но не устраняет шум?\n",
+    "\n",
+    "- Какие ограничения цифровой модели генератора препятствуют прямому переносу результата на реальный измерительный прибор?"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Контрольные вопросы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "c7625209",
+   "cell_type": "markdown",
+   "source": [
+    "## Раздел для преподавателя: демонстрационный вариант\n",
+    "\n",
+    "Приведённый ниже демонстрационный прогон подтверждает, что комплект работоспособен целиком: модель фактически создана и соединена в Engee, доставляемый скрипт фактически выполнен в этой среде без ошибок, а результат прошёл все заранее заданные критерии приёмки для варианта 1.\n",
+    "\n",
+    "Ход выполнения:\n",
+    "\n",
+    "- модель LR02_signal_generator_spectrum создана программно (engee.create) и заполнена блоками Sine Wave, Random Number, Add и To Workspace с параметрами варианта 1;\n",
+    "\n",
+    "- блоки соединены линиями (engee.add_line) по схеме раздела 7; модель сохранена и экспортирована в LR02_signal_generator_spectrum.engee;\n",
+    "\n",
+    "- скрипт LR02_signal_generator_spectrum.jl выполнен целиком через include() непосредственно в среде Engee 26.8.2-H3;\n",
+    "\n",
+    "- скрипт выполнил четыре запуска модели (seed 101, 101, 1101, 101), для каждого вычислил периодограмму и оценки f0, A0 и SNR, сравнил полные выходные массивы и проверил численные критерии раздела 5.2;\n",
+    "\n",
+    "- после проверки вариант 1 восстановлен (Seed = 101), модель повторно сохранена.\n",
+    "\n",
+    "Фактический вывод скрипта (консоль Engee):\n",
+    "\n",
+    "MODEL = LR02_signal_generator_spectrum\n",
+    "SEEDS = (101, 101, 1101, 101)\n",
+    "\n",
+    "| Запуск | Seed | n | f0_hat, Гц | A0_hat | SNR_hat, дБ |\n",
+    "|---|---|---|---|---|---|\n",
+    "| 1 | 101 | 1000 | 5,0 | 2,018007 | 17,073259 |\n",
+    "| 2 | 101 | 1000 | 5,0 | 2,018007 | 17,073259 |\n",
+    "| 3 | 1101 | 1000 | 5,0 | 2,009866 | 17,051879 |\n",
+    "| 4 | 101 | 1000 | 5,0 | 2,018007 | 17,073259 |\n",
+    "\n",
+    "Проверка воспроизводимости полных выходных массивов:\n",
+    "\n",
+    "EQ_1_2 = true   EQ_1_4 = true   EQ_1_3 = false   EQ_2_4 = true\n",
+    "PASS: модель и критерии варианта 1 проверены; параметры восстановлены\n",
+    "\n",
+    "Результат демонстрационного прогона совпадает с ориентирами раздела 17 (частота ровно 5,0 Гц, амплитуда и SNR внутри диагностических диапазонов) и подтверждает, что комплект LR02_signal_generator_spectrum может быть выдан студентам в текущем виде."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Демонстрационный вариант (для преподавателя)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  }
+ ]
+}

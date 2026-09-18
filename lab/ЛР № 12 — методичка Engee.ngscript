@@ -1,0 +1,724 @@
+{
+ "nbformat": 4,
+ "nbformat_minor": 2,
+ "metadata": {
+  "kernelspec": {
+   "display_name": "IJulia 1.9.3",
+   "language": "julia",
+   "name": "ijulia-1.9"
+  },
+  "language_info": {
+   "file_extension": ".jl",
+   "mimetype": "application/julia",
+   "name": "julia",
+   "version": "1.9.3"
+  },
+  "engee": {}
+ },
+ "cells": [
+  {
+   "id": "af4a5231",
+   "cell_type": "markdown",
+   "source": [
+    "# Лабораторная работа № 12\n",
+    "\n",
+    "*Формирование и экспорт потоковой телеметрии из модели Engee*\n",
+    "\n",
+    "- Контроль качества данных: полнота временного ряда\n",
+    "- Дисциплина: «Измерения в телекоммуникационных системах»\n",
+    "- Специальность: 10.05.02 «Информационная безопасность телекоммуникационных систем»\n",
+    "- Специализация: № 9 «Управление безопасностью телекоммуникационных систем и сетей»\n",
+    "- Формат: модельный измерительный эксперимент в Engee\n",
+    "- Продолжительность: 2 академических часа\n",
+    "- Форма работы: индивидуальная работа на учебной платформе Engee\n",
+    "- Контроль: отчёт, модель LR12_streaming_telemetry.engee, выполненный скрипт LR12_streaming_telemetry.jl, устная защита"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Титул",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "853e6a00",
+   "cell_type": "markdown",
+   "source": [
+    "## 1. Цель работы\n",
+    "\n",
+    "Освоить формирование временного ряда потоковой телеметрии в Engee и оценку одного из ключевых показателей качества измерительных данных — полноты (completeness): доли фактически полученных отсчётов относительно ожидаемого числа. Работа опирается на материал лекции 12 (потоковая телеметрия, временные ряды, частота сбора)."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Цель работы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "cb3215e9",
+   "cell_type": "markdown",
+   "source": [
+    "## 6. Индивидуальные варианты\n",
+    "\n",
+    "Номер варианта назначает преподаватель. Во всех вариантах: f0 = 0,5 Гц, N = 2000, SampleTime = 0,01 с, Start time = 0 с, Stop time = 19,99 с, Fixed step решателя = 0,01 с, альтернативный seed равен Seed + 1000. Вариант 1 зарезервирован для демонстрационного прогона (раздел 18.5) и не выдаётся студентам как расчётный.\n",
+    "\n",
+    "| Вариант | A0 | σ² | Z (порог потерь) | Seed |\n",
+    "|---|---|---|---|---|\n",
+    "| 1 | 5,0 | 0,04 | 1,645 | 101 |\n",
+    "| 2 | 4,0 | 0,02 | 1,282 | 127 |\n",
+    "| 3 | 6,0 | 0,09 | 2,054 | 149 |\n",
+    "| 4 | 3,0 | 0,01 | 1,036 | 173 |\n",
+    "| 5 | 7,0 | 0,16 | 1,881 | 197 |\n",
+    "| 6 | 4,5 | 0,04 | 1,751 | 223 |\n",
+    "| 7 | 5,5 | 0,06 | 1,405 | 251 |\n",
+    "| 8 | 3,5 | 0,02 | 1,555 | 277 |\n",
+    "| 9 | 6,5 | 0,12 | 2,170 | 307 |\n",
+    "| 10 | 4,0 | 0,04 | 1,150 | 331 |\n",
+    "| 11 | 5,0 | 0,05 | 1,645 | 359 |\n",
+    "| 12 | 3,5 | 0,02 | 1,960 | 383 |\n",
+    "| 13 | 6,0 | 0,09 | 1,282 | 409 |\n",
+    "| 14 | 4,5 | 0,03 | 1,881 | 433 |\n",
+    "| 15 | 5,5 | 0,07 | 1,405 | 457 |\n",
+    "| 16 | 4,0 | 0,04 | 1,751 | 479 |\n",
+    "| 17 | 7,0 | 0,16 | 1,036 | 503 |\n",
+    "| 18 | 5,0 | 0,05 | 2,054 | 541 |\n",
+    "| 19 | 3,0 | 0,01 | 1,555 | 563 |\n",
+    "| 20 | 6,5 | 0,12 | 1,150 | 587 |\n",
+    "| 21 | 4,5 | 0,03 | 1,960 | 613 |\n",
+    "| 22 | 5,5 | 0,06 | 1,282 | 641 |\n",
+    "| 23 | 4,0 | 0,04 | 1,645 | 659 |"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Индивидуальные варианты",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "fa5a3f48",
+   "cell_type": "markdown",
+   "source": [
+    "## 5. Теоретические сведения\n",
+    "\n",
+    "## 5.1. Модель телеметрического временного ряда\n",
+    "\n",
+    "Значение телеметрии в данной работе моделируется как периодический показатель (например, упрощённый суточный цикл нагрузки) с аддитивным измерительным шумом, дискретизированный с постоянным периодом сбора Ts:\n",
+    "\n",
+    "telemetry[k] = A0·sin(2π·f0·k·Ts) + w[k],   w[k] ~ N(0, σ²)\n",
+    "\n",
+    "Каждый отсчёт k представляет одно измерение потоковой телеметрии, снятое через постоянный интервал Ts (частота сбора).\n",
+    "\n",
+    "## 5.2. Моделирование потерь отсчётов\n",
+    "\n",
+    "В реальной системе потоковой телеметрии часть отсчётов может не дойти до получателя (сетевые потери, временная недоступность источника). В данной работе потеря отсчёта k моделируется независимым пороговым событием на основе вспомогательного гауссовского процесса g[k] ~ N(0, 1):\n",
+    "\n",
+    "loss_flag[k] = (g[k] > Z),   Z — заданный порог\n",
+    "\n",
+    "Вероятность потери одного отсчёта определяется хвостом стандартного нормального распределения:\n",
+    "\n",
+    "p_loss(theory) = Q(Z) = 0.5·erfc(Z/√2)\n",
+    "\n",
+    "## 5.3. Показатели качества данных\n",
+    "\n",
+    "Полнота временного ряда (completeness) — доля отсчётов, НЕ отмеченных как потерянные:\n",
+    "\n",
+    "completeness = 1 − (число потерянных отсчётов) / N\n",
+    "\n",
+    "Дополнительный показатель — максимальная длина непрерывной последовательности потерянных отсчётов (max_gap), важный для реальных систем мониторинга: даже при высокой средней полноте один длинный непрерывный пропуск может скрыть значимое событие (см. лекцию 12, эффект наложения при недостаточной частоте наблюдения).\n",
+    "\n",
+    "## 5.4. Заранее заданные критерии\n",
+    "\n",
+    "Для варианта 1 используются A0 = 5,0, σ² = 0,04 (измерительный шум), f0 = 0,5 Гц, Z = 1,645 (номинальная вероятность потери p_loss ≈ 0,05, ожидаемая полнота ≈ 0,95), N = 2000, SampleTime = 0,01 с.\n",
+    "\n",
+    "Жёсткие критерии:\n",
+    "\n",
+    "- оба массива (значение телеметрии и индикатор потерь) содержат ровно 2000 конечных значений;\n",
+    "\n",
+    "- запуски с одинаковыми параметрами и seed дают одинаковые полные массивы для обоих выходов;\n",
+    "\n",
+    "- изменение только seed изменяет оба полных выходных массива;\n",
+    "\n",
+    "- после проверки восстановлены параметры варианта 1.\n",
+    "\n",
+    "Численный критерий (вариант 1):\n",
+    "\n",
+    "- измеренная доля потерь (1 − completeness) отличается от теоретической p_loss не более чем в 2 раза в любую сторону.\n",
+    "\n",
+    "Статистические границы являются диагностическими для данной учебной модели, а не универсальными метрологическими допусками.\n",
+    "\n",
+    "## 5.5. Ограничения модели\n",
+    "\n",
+    "- потери отсчётов моделируются как независимые события; в реальных сетях потери часто коррелированы во времени (пачками, а не поодиночке) — эта модель даёт нижнюю оценку типичной длины пропуска;\n",
+    "\n",
+    "- частота сбора в модели постоянна; в реальной потоковой телеметрии частота может динамически изменяться;\n",
+    "\n",
+    "- кардинальность (число уникальных временных рядов) в данной модели равна единице — вопросы масштабирования при большом числе рядов рассматриваются только на уровне лекции;\n",
+    "\n",
+    "- модель не воспроизводит неточность самих меток времени (лекция 7, лекция 12, раздел 6) — предполагается, что каждая метка времени точна;\n",
+    "\n",
+    "- цифровая модель не заменяет реальную систему сбора телеметрии и оценку качества данных на реальном трафике."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Теоретические сведения",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "71f45fdf",
+   "cell_type": "markdown",
+   "source": [
+    "## Построение модели в Engee\n",
+    "\n",
+    "Выполните ячейки ниже по порядку — они создадут модель `LR12_streaming_telemetry` программно, через API Engee, и соединят блоки в точности по схеме, приведённой в методических указаниях (.docx) этой лабораторной работы. Для первичной проверки используются параметры варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: построение модели",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "d06d3fc5",
+   "cell_type": "code",
+   "source": [
+    "m = engee.create(\"LR12_streaming_telemetry\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Создать модель",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "1f19c55d",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Sine Wave\", \"LR12_streaming_telemetry/TelemetryValue\")\n",
+    "engee.set_param!(\"LR12_streaming_telemetry/TelemetryValue\", \"Amplitude\"=>\"5\", \"Frequency\"=>\"3.14159265\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок TelemetryValue",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "5bb4995a",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR12_streaming_telemetry/MeasNoise\")\n",
+    "engee.set_param!(\"LR12_streaming_telemetry/MeasNoise\", \"Mean\"=>\"0\", \"Variance\"=>\"0.04\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок MeasNoise",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "056b16a6",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR12_streaming_telemetry/SignalSum\")\n",
+    "engee.set_param!(\"LR12_streaming_telemetry/SignalSum\", \"Inputs\"=>\"++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок SignalSum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "2e734627",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR12_streaming_telemetry/MeasuredOutput\")\n",
+    "engee.set_param!(\"LR12_streaming_telemetry/MeasuredOutput\", \"VariableName\"=>\"telemetry_raw\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок MeasuredOutput",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "075c8d60",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR12_streaming_telemetry/LossNoise\")\n",
+    "engee.set_param!(\"LR12_streaming_telemetry/LossNoise\", \"Mean\"=>\"0\", \"Variance\"=>\"1\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок LossNoise",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "0253e8e6",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR12_streaming_telemetry/LossOutput\")\n",
+    "engee.set_param!(\"LR12_streaming_telemetry/LossOutput\", \"VariableName\"=>\"loss_gaussian\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок LossOutput",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "1a2705fb",
+   "cell_type": "code",
+   "source": [
+    "engee.add_line(\"LR12_streaming_telemetry\", \"TelemetryValue/main_out\", \"SignalSum/in_1\")\n",
+    "engee.add_line(\"LR12_streaming_telemetry\", \"MeasNoise/Output_1\", \"SignalSum/in_2\")\n",
+    "engee.add_line(\"LR12_streaming_telemetry\", \"SignalSum/main_out\", \"MeasuredOutput/Input_1\")\n",
+    "engee.add_line(\"LR12_streaming_telemetry\", \"LossNoise/Output_1\", \"LossOutput/Input_1\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Соединить блоки",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "fe34d4be",
+   "cell_type": "code",
+   "source": [
+    "engee.set_param!(\"LR12_streaming_telemetry\", \"StartTime\"=>\"0\", \"StopTime\"=>\"19.99\", \"FixedStep\"=>\"0.01\")\n",
+    "engee.save(m, \"LR12_streaming_telemetry.engee\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Параметры моделирования и сохранение",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "c953a089",
+   "cell_type": "code",
+   "source": [
+    "engee.run(\"LR12_streaming_telemetry\")\n",
+    "println(\"telemetry_raw: N=\", length(telemetry_raw.value))\n",
+    "println(\"loss_gaussian: N=\", length(loss_gaussian.value))"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Запустить и проверить",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "a922e91c",
+   "cell_type": "markdown",
+   "source": [
+    "## Обработка результатов\n",
+    "\n",
+    "Ячейка ниже — выполненный и проверенный скрипт `LR12_streaming_telemetry.jl` (реальный результат прогона приведён в разделе «Демонстрационный вариант» ниже). Скрипт выполняет протокол воспроизводимости (4 запуска: seed, seed, seed+1000, seed) и проверяет все заранее заданные численные критерии варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: обработка результатов",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "62a19ba7",
+   "cell_type": "code",
+   "source": [
+    "using Statistics\n",
+    "using SpecialFunctions: erfc\n",
+    "\n",
+    "const NSAMP = 2000\n",
+    "const Z_LOSS = 1.645\n",
+    "const SEED = 101\n",
+    "\n",
+    "Qfun(x) = 0.5 * erfc(x / sqrt(2))\n",
+    "\n",
+    "function run_lr12(seed::Integer)\n",
+    "    engee.set_param!(\"LR12_streaming_telemetry/MeasNoise\", \"Seed\" => string(seed))\n",
+    "    engee.set_param!(\"LR12_streaming_telemetry/LossNoise\", \"Seed\" => string(seed))\n",
+    "    engee.run(\"LR12_streaming_telemetry\")\n",
+    "    raw = collect(Float64, telemetry_raw.value)\n",
+    "    lossg = collect(Float64, loss_gaussian.value)\n",
+    "    loss_flag = lossg .> Z_LOSS\n",
+    "    n_lost = count(loss_flag)\n",
+    "    completeness = 1 - n_lost / NSAMP\n",
+    "    max_gap = 0\n",
+    "    cur_gap = 0\n",
+    "    for f in loss_flag\n",
+    "        if f\n",
+    "            cur_gap += 1\n",
+    "            max_gap = max(max_gap, cur_gap)\n",
+    "        else\n",
+    "            cur_gap = 0\n",
+    "        end\n",
+    "    end\n",
+    "    return (raw=raw, lossg=lossg, n_lost=n_lost, completeness=completeness, max_gap=max_gap)\n",
+    "end\n",
+    "\n",
+    "r1 = run_lr12(SEED)\n",
+    "r2 = run_lr12(SEED)\n",
+    "r3 = run_lr12(SEED + 1000)\n",
+    "r4 = run_lr12(SEED)\n",
+    "\n",
+    "EQ_raw_1_2 = r1.raw == r2.raw\n",
+    "EQ_raw_1_4 = r1.raw == r4.raw\n",
+    "EQ_raw_1_3 = r1.raw == r3.raw\n",
+    "EQ_raw_2_4 = r2.raw == r4.raw\n",
+    "\n",
+    "EQ_loss_1_2 = r1.lossg == r2.lossg\n",
+    "EQ_loss_1_4 = r1.lossg == r4.lossg\n",
+    "EQ_loss_1_3 = r1.lossg == r3.lossg\n",
+    "EQ_loss_2_4 = r2.lossg == r4.lossg\n",
+    "\n",
+    "p_loss_theory = Qfun(Z_LOSS)\n",
+    "completeness_theory = 1 - p_loss_theory\n",
+    "\n",
+    "println(\"n_lost=\", r1.n_lost, \" completeness=\", r1.completeness, \" completeness_theory=\", completeness_theory)\n",
+    "println(\"max_gap=\", r1.max_gap)\n",
+    "println(\"EQ_raw: \", EQ_raw_1_2, \" \", EQ_raw_1_4, \" \", EQ_raw_1_3, \" \", EQ_raw_2_4)\n",
+    "println(\"EQ_loss: \", EQ_loss_1_2, \" \", EQ_loss_1_4, \" \", EQ_loss_1_3, \" \", EQ_loss_2_4)\n",
+    "\n",
+    "ratio = (1 - r1.completeness) / p_loss_theory\n",
+    "PASS = EQ_raw_1_2 && EQ_raw_1_4 && !EQ_raw_1_3 && EQ_raw_2_4 &&\n",
+    "       EQ_loss_1_2 && EQ_loss_1_4 && !EQ_loss_1_3 && EQ_loss_2_4 &&\n",
+    "       0.5 <= ratio <= 2.0\n",
+    "println(\"PASS=\", PASS)"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Скрипт обработки (delivery script)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "611e1723",
+   "cell_type": "markdown",
+   "source": [
+    "## 15. Контрольные вопросы\n",
+    "\n",
+    "- Почему полнота временного ряда — не единственный значимый показатель качества телеметрии (см. max_gap)?\n",
+    "\n",
+    "- Как связаны порог Z и теоретическая вероятность потери отсчёта?\n",
+    "\n",
+    "- Почему независимая модель потерь даёт заниженную оценку типичной длины реального пропуска?\n",
+    "\n",
+    "- Что произойдёт с completeness и max_gap при значительном снижении Z?\n",
+    "\n",
+    "- Почему одинаковый seed должен воспроизводить оба полных выходных массива?\n",
+    "\n",
+    "- Как частота сбора (лекция 12) связана с последствиями пропуска отсчёта?\n",
+    "\n",
+    "- Что такое кардинальность временных рядов и почему она не моделируется явно в этой работе?\n",
+    "\n",
+    "- Какое упрощение сделано в модели относительно точности меток времени?\n",
+    "\n",
+    "- Чем эта работа отличается от предыдущих лабораторных работ по типу анализируемого показателя (не физический сигнал, а показатель качества данных)?\n",
+    "\n",
+    "- Как можно было бы расширить модель для учёта коррелированных (пачками) потерь отсчётов?"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Контрольные вопросы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "c15f277b",
+   "cell_type": "markdown",
+   "source": [
+    "## Раздел для преподавателя: демонстрационный вариант\n",
+    "\n",
+    "Вариант 1 зарезервирован исключительно для демонстрационного прогона и не выдаётся студентам как расчётный (раздел 6). Приведённый ниже прогон подтверждает, что комплект работоспособен целиком: модель фактически создана и соединена в Engee, доставляемый скрипт фактически выполнен в этой среде без ошибок, а результат прошёл все заранее заданные критерии приёмки.\n",
+    "\n",
+    "Ход выполнения:\n",
+    "\n",
+    "- модель LR12_streaming_telemetry создана программно (engee.create) и заполнена блоками Sine Wave, двух независимых Random Number, Add и двух To Workspace;\n",
+    "\n",
+    "- блоки соединены линиями (engee.add_line) по схеме раздела 7; шаг решателя (Fixed step) установлен равным шагу дискретизации блоков (0,01 с); модель сохранена и экспортирована в LR12_streaming_telemetry.engee;\n",
+    "\n",
+    "- в ходе построения скрипта терминал Engee временно перешёл в некорректное состояние из-за случайно отправленной управляющей последовательности (не связанной с содержимым скрипта); состояние терминала восстановлено штатной комбинацией очистки строки ввода, после чего работа продолжена без потери данных и без повторного создания модели;\n",
+    "\n",
+    "- скрипт LR12_streaming_telemetry.jl выполнен целиком через include() непосредственно в среде Engee 26.8.2-H3 без ошибок;\n",
+    "\n",
+    "- скрипт выполнил четыре запуска модели (seed 101, 101, 1101, 101), для каждого вычислил долю потерянных отсчётов, полноту и максимальный непрерывный пропуск, сравнил полные выходные массивы обоих выходов и проверил численный критерий раздела 5.4;\n",
+    "\n",
+    "- после проверки вариант 1 восстановлен (Seed = 101), модель повторно сохранена.\n",
+    "\n",
+    "Фактический вывод скрипта (консоль Engee):\n",
+    "\n",
+    "n_lost=109 completeness=0.9455 completeness_theory=0.9500150944608786\n",
+    "max_gap=2\n",
+    "EQ_raw: true true false true\n",
+    "EQ_loss: true true false true\n",
+    "PASS=true\n",
+    "\n",
+    "| Величина | Значение |\n",
+    "|---|---|\n",
+    "| N | 2000 |\n",
+    "| n_lost | 109 |\n",
+    "| completeness (измеренное) | 0,9455 |\n",
+    "| completeness (теоретическое) | 0,9500 |\n",
+    "| max_gap | 2 |\n",
+    "\n",
+    "Проверка воспроизводимости полных выходных массивов:\n",
+    "\n",
+    "EQ_raw:  true true false true\n",
+    "EQ_loss: true true false true\n",
+    "PASS: модель и критерии варианта 1 проверены; параметры восстановлены\n",
+    "\n",
+    "Результат демонстрационного прогона совпадает с ориентирами раздела 17: измеренная полнота (0,9455) отличается от теоретической (0,9500) менее чем на 1 процентный пункт, а максимальный непрерывный пропуск составил всего 2 отсчёта. Это подтверждает, что комплект LR12_streaming_telemetry может быть выдан студентам в текущем виде."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Демонстрационный вариант (для преподавателя)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  }
+ ]
+}

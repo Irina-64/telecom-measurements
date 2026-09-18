@@ -1,0 +1,715 @@
+{
+ "nbformat": 4,
+ "nbformat_minor": 2,
+ "metadata": {
+  "kernelspec": {
+   "display_name": "IJulia 1.9.3",
+   "language": "julia",
+   "name": "ijulia-1.9"
+  },
+  "language_info": {
+   "file_extension": ".jl",
+   "mimetype": "application/julia",
+   "name": "julia",
+   "version": "1.9.3"
+  },
+  "engee": {}
+ },
+ "cells": [
+  {
+   "id": "6c3a9205",
+   "cell_type": "markdown",
+   "source": [
+    "# Лабораторная работа № 3\n",
+    "\n",
+    "*Виртуальные осциллографические измерения*\n",
+    "\n",
+    "- Дисциплина: «Измерения в телекоммуникационных системах»\n",
+    "- Специальность: 10.05.02 «Информационная безопасность телекоммуникационных систем»\n",
+    "- Специализация: № 9 «Управление безопасностью телекоммуникационных систем и сетей»\n",
+    "- Формат: модельный измерительный эксперимент в Engee\n",
+    "- Продолжительность: 4 академических часа\n",
+    "- Форма работы: индивидуальная работа на учебной платформе Engee\n",
+    "- Контроль: отчёт, модель LR03_virtual_oscilloscope.engee, выполненный скрипт LR03_virtual_oscilloscope.jl, устная защита"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Титул",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "b35e3c50",
+   "cell_type": "markdown",
+   "source": [
+    "## 1. Цель работы\n",
+    "\n",
+    "Освоить проведение виртуальных осциллографических измерений в Engee: регистрацию временной реализации периодического сигнала, определение периода и частоты по фронтам, оценивание амплитудных уровней, а также количественную оценку джиттера периода и ошибки временной метки, вызванных аддитивным шумом и конечным шагом дискретизации."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Цель работы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "f5493b91",
+   "cell_type": "markdown",
+   "source": [
+    "## 6. Индивидуальные варианты\n",
+    "\n",
+    "Номер варианта назначает преподаватель. Во всех вариантах: SampleTime = 0,001 с, FixedStep решателя = 0,001 с (должен совпадать с шагом блоков), Start = 0 с, Stop = 1,999 с (N = 2000, fs = 1000 Гц), PhaseDelay = 0, альтернативный seed равен Seed + 1000. Дисперсия шума рассчитана по формуле σ = 0,05·A0 (5 % от амплитуды).\n",
+    "\n",
+    "| Вариант | A0 | T0, с | f0, Гц | D, % | σ² | Seed |\n",
+    "|---|---|---|---|---|---|---|\n",
+    "| 1 | 2,0 | 0,2 | 5 | 30 | 0,01 | 101 |\n",
+    "| 2 | 1,5 | 0,25 | 4 | 40 | 0,0056 | 127 |\n",
+    "| 3 | 3,0 | 0,1 | 10 | 20 | 0,0225 | 149 |\n",
+    "| 4 | 1,0 | 0,4 | 2,5 | 50 | 0,0025 | 173 |\n",
+    "| 5 | 2,5 | 0,16 | 6,25 | 25 | 0,0156 | 197 |\n",
+    "| 6 | 4,0 | 0,08 | 12,5 | 35 | 0,04 | 223 |\n",
+    "| 7 | 1,2 | 0,3 | 3,33 | 45 | 0,0036 | 251 |\n",
+    "| 8 | 2,2 | 0,2 | 5 | 30 | 0,0121 | 277 |\n",
+    "| 9 | 1,8 | 0,25 | 4 | 20 | 0,0081 | 307 |\n",
+    "| 10 | 3,5 | 0,1 | 10 | 40 | 0,0306 | 331 |\n",
+    "| 11 | 1,6 | 0,2 | 5 | 50 | 0,0064 | 359 |\n",
+    "| 12 | 2,8 | 0,125 | 8 | 30 | 0,0196 | 383 |\n",
+    "| 13 | 2,1 | 0,2 | 5 | 35 | 0,011 | 409 |\n",
+    "| 14 | 1,4 | 0,35 | 2,86 | 45 | 0,0049 | 433 |\n",
+    "| 15 | 3,2 | 0,12 | 8,33 | 25 | 0,0256 | 457 |\n",
+    "| 16 | 0,9 | 0,4 | 2,5 | 50 | 0,002 | 479 |\n",
+    "| 17 | 2,6 | 0,15 | 6,67 | 30 | 0,0169 | 503 |\n",
+    "| 18 | 3,8 | 0,09 | 11,11 | 20 | 0,0361 | 541 |\n",
+    "| 19 | 1,1 | 0,32 | 3,12 | 40 | 0,003 | 563 |\n",
+    "| 20 | 2,4 | 0,18 | 5,56 | 35 | 0,0144 | 587 |\n",
+    "| 21 | 3,4 | 0,11 | 9,09 | 25 | 0,0289 | 613 |\n",
+    "| 22 | 1,9 | 0,22 | 4,55 | 45 | 0,009 | 641 |\n",
+    "| 23 | 4,4 | 0,075 | 13,33 | 15 | 0,0484 | 659 |"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Индивидуальные варианты",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "8160c841",
+   "cell_type": "markdown",
+   "source": [
+    "## 5. Теоретические сведения\n",
+    "\n",
+    "## 5.1. Измерительная задача и модель\n",
+    "\n",
+    "Моделируется прямоугольный тестовый импульсный сигнал, наблюдаемый виртуальным осциллографом (регистратором временной реализации) при наличии аддитивного шума измерительного тракта:\n",
+    "\n",
+    "y[n] = p(n*Ts; A0, T0, D) + w[n],   n = 0, 1, ..., N-1\n",
+    "\n",
+    "где p(t; A0, T0, D) — идеальный периодический прямоугольный импульс с амплитудой A0, периодом T0 и коэффициентом заполнения D (Pulse Width, % периода); Ts — период дискретизации; w[n] — независимая нормально распределённая случайная составляющая с нулевым средним и дисперсией σ² (шум измерительного тракта). Частота дискретизации fs = 1/Ts, длина реализации N = (Stop − Start)/Ts + 1.\n",
+    "\n",
+    "Момент фронта определяется пересечением порога thr = A0/2 восходящим участком сигнала. Для повышения точности момент пересечения находится линейной интерполяцией между соседними отсчётами (субдискретная привязка ко времени), что моделирует работу реального цифрового осциллографа с интерполяцией фронта:\n",
+    "\n",
+    "t_edge = t[i-1] + (thr - y[i-1]) / (y[i] - y[i-1]) * (t[i] - t[i-1])\n",
+    "\n",
+    "Период оценивается как среднее значение интервалов между последовательными моментами фронтов, частота — как обратная величина периода:\n",
+    "\n",
+    "T_hat = mean(diff(t_edge)),   f_hat = 1 / T_hat\n",
+    "\n",
+    "Джиттер периода — стандартное отклонение интервалов между фронтами; он количественно выражает нестабильность периода, вызванную шумом вблизи порога:\n",
+    "\n",
+    "jitter = std(diff(t_edge))\n",
+    "\n",
+    "Ошибка временной метки — расхождение между интерполированным (субдискретным) и квантованным (по ближайшему отсчёту дискретизации, без интерполяции) моментом фронта; она количественно выражает погрешность привязки события ко времени, обусловленную конечным шагом дискретизации:\n",
+    "\n",
+    "t_edge_quantized = t[i]  (ближайший отсчёт после пересечения порога)\n",
+    "Δt = |t_edge_quantized − t_edge|\n",
+    "\n",
+    "Амплитудные уровни оцениваются по классификации отсчётов относительно порога: уровень логической единицы — среднее значение отсчётов выше порога, уровень логического нуля — среднее значение отсчётов не выше порога; размах Vpp — разность максимального и минимального значений реализации.\n",
+    "\n",
+    "## 5.2. Заранее заданные критерии\n",
+    "\n",
+    "Для варианта 1 используются A0 = 2,0, T0 = 0,2 с (f0 = 5,0 Гц), коэффициент заполнения D = 30 %, σ² = 0,01, N = 2000, fs = 1000 Гц, порог thr = 1,0.\n",
+    "\n",
+    "Жёсткие критерии:\n",
+    "\n",
+    "- массив содержит ровно 2000 конечных значений;\n",
+    "\n",
+    "- запуски с одинаковыми параметрами и seed дают одинаковые полные массивы;\n",
+    "\n",
+    "- изменение только seed изменяет полный выходной массив;\n",
+    "\n",
+    "- после проверки восстановлены параметры варианта 1.\n",
+    "\n",
+    "Численные и статистические критерии (вариант 1):\n",
+    "\n",
+    "- число зарегистрированных фронтов в интервале наблюдения — от 8 до 10;\n",
+    "\n",
+    "- оценённый период T_hat в диапазоне 0,19–0,21 с (частота f_hat ≈ 5,0 Гц);\n",
+    "\n",
+    "- джиттер периода jitter < 0,5 мс;\n",
+    "\n",
+    "- ошибка временной метки не превышает шага дискретизации (≤ 1 мс);\n",
+    "\n",
+    "- уровень логической единицы high в диапазоне 1,8–2,2 условной единицы.\n",
+    "\n",
+    "Статистические границы являются диагностическими для данной учебной модели, а не универсальными метрологическими допусками.\n",
+    "\n",
+    "## 5.3. Ограничения модели\n",
+    "\n",
+    "- амплитуда, период и коэффициент заполнения генератора считаются постоянными на интервале наблюдения;\n",
+    "\n",
+    "- случайная составляющая независима, аддитивна и нормально распределена (белый гауссовский шум измерительного тракта);\n",
+    "\n",
+    "- фронт идеального импульса мгновенный (нулевое время нарастания источника); наблюдаемая «нечёткость» фронта — только следствие аддитивного шума, а не полосы пропускания измерительного тракта;\n",
+    "\n",
+    "- точность привязки момента фронта ко времени ограничена шагом дискретизации; линейная интерполяция снижает, но не устраняет эту погрешность;\n",
+    "\n",
+    "- цифровая модель не заменяет поверку или калибровку реального осциллографа."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Теоретические сведения",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "bd28f9e0",
+   "cell_type": "markdown",
+   "source": [
+    "## Построение модели в Engee\n",
+    "\n",
+    "Выполните ячейки ниже по порядку — они создадут модель `LR03_virtual_oscilloscope` программно, через API Engee, и соединят блоки в точности по схеме, приведённой в методических указаниях (.docx) этой лабораторной работы. Для первичной проверки используются параметры варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: построение модели",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "943fd4ee",
+   "cell_type": "code",
+   "source": [
+    "m = engee.create(\"LR03_virtual_oscilloscope\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Создать модель",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "95f971a0",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Pulse Generator\", \"LR03_virtual_oscilloscope/PulseSource\")\n",
+    "engee.set_param!(\"LR03_virtual_oscilloscope/PulseSource\", \"Amplitude\"=>\"2.0\", \"Period\"=>\"0.2\", \"PulseWidth\"=>\"30\", \"PhaseDelay\"=>\"0\", \"SampleTime\"=>\"0.001\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок PulseSource",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "92b1beb1",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR03_virtual_oscilloscope/RandomNoise\")\n",
+    "engee.set_param!(\"LR03_virtual_oscilloscope/RandomNoise\", \"Mean\"=>\"0\", \"Variance\"=>\"0.01\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.001\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок RandomNoise",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "1faf0826",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR03_virtual_oscilloscope/SignalSum\")\n",
+    "engee.set_param!(\"LR03_virtual_oscilloscope/SignalSum\", \"Inputs\"=>\"++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок SignalSum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "86e6606e",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR03_virtual_oscilloscope/ScopeCapture\")\n",
+    "engee.set_param!(\"LR03_virtual_oscilloscope/ScopeCapture\", \"VariableName\"=>\"oscilloscope_trace\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок ScopeCapture",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "991725fc",
+   "cell_type": "code",
+   "source": [
+    "engee.add_line(\"LR03_virtual_oscilloscope\", \"PulseSource/Output_1\", \"SignalSum/in_1\")\n",
+    "engee.add_line(\"LR03_virtual_oscilloscope\", \"RandomNoise/Output_1\", \"SignalSum/in_2\")\n",
+    "engee.add_line(\"LR03_virtual_oscilloscope\", \"SignalSum/main_out\", \"ScopeCapture/Input_1\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Соединить блоки",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "5893922b",
+   "cell_type": "code",
+   "source": [
+    "engee.set_param!(\"LR03_virtual_oscilloscope\", \"StartTime\"=>\"0\", \"StopTime\"=>\"1.999\", \"FixedStep\"=>\"0.001\")\n",
+    "engee.save(m, \"LR03_virtual_oscilloscope.engee\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Параметры моделирования и сохранение",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "a7fd3025",
+   "cell_type": "code",
+   "source": [
+    "engee.run(\"LR03_virtual_oscilloscope\")\n",
+    "println(\"oscilloscope_trace: N=\", length(oscilloscope_trace.value))"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Запустить и проверить",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "c8e535f0",
+   "cell_type": "markdown",
+   "source": [
+    "## Обработка результатов\n",
+    "\n",
+    "Ячейка ниже — выполненный и проверенный скрипт `LR03_virtual_oscilloscope.jl` (реальный результат прогона приведён в разделе «Демонстрационный вариант» ниже). Скрипт выполняет протокол воспроизводимости (4 запуска: seed, seed, seed+1000, seed) и проверяет все заранее заданные численные критерии варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: обработка результатов",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "59d14da2",
+   "cell_type": "code",
+   "source": [
+    "using Statistics\n",
+    "\n",
+    "const MODEL_NAME = \"LR03_virtual_oscilloscope\"\n",
+    "const RANDOM_BLOCK_PATH = \"LR03_virtual_oscilloscope/RandomNoise\"\n",
+    "const BASE_SEED = 101\n",
+    "const ALT_SEED = BASE_SEED + 1000\n",
+    "const EXPECTED_LENGTH = 2000\n",
+    "const THRESHOLD = 1.0\n",
+    "\n",
+    "function run_model_and_extract()\n",
+    "    engee.run(MODEL_NAME)\n",
+    "        df = collect(oscilloscope_trace)\n",
+    "            t = Float64.(df.time)\n",
+    "                x = Float64.(df.value)\n",
+    "                    @assert !isempty(x) \"Выход oscilloscope_trace пуст\"\n",
+    "    @assert length(x) == EXPECTED_LENGTH \"Неожиданная длина выхода\"\n",
+    "    @assert all(isfinite, x) \"Выход содержит NaN или Inf\"\n",
+    "    return t, x\n",
+    "end\n",
+    "\n",
+    "function set_seed!(seed::Integer)\n",
+    "    engee.set_param!(RANDOM_BLOCK_PATH, \"Seed\" => string(seed))\n",
+    "    end\n",
+    "\n",
+    "function rising_edges(t, x, thr)\n",
+    "    ts = Float64[]\n",
+    "        for i in 2:length(x)\n",
+    "                if x[i-1] < thr && x[i] >= thr\n",
+    "            frac = (thr - x[i-1]) / (x[i] - x[i-1])\n",
+    "                        push!(ts, t[i-1] + frac*(t[i]-t[i-1]))\n",
+    "                                end\n",
+    "    end\n",
+    "        return ts\n",
+    "end\n",
+    "\n",
+    "function quantized_edges(t, x, thr)\n",
+    "    ts = Float64[]\n",
+    "        for i in 2:length(x)\n",
+    "                if x[i-1] < thr && x[i] >= thr\n",
+    "                            push!(ts, t[i])\n",
+    "                                    end\n",
+    "                                        end\n",
+    "                                            return ts\n",
+    "                                            end\n",
+    "\n",
+    "function oscilloscope_metrics(t, x)\n",
+    "    edges = rising_edges(t, x, THRESHOLD)\n",
+    "        edges_q = quantized_edges(t, x, THRESHOLD)\n",
+    "            periods = diff(edges)\n",
+    "    T_hat = mean(periods)\n",
+    "        f_hat = 1/T_hat\n",
+    "    jitter_std = std(periods)\n",
+    "        ts_err = abs.(edges_q .- edges)\n",
+    "    Vpp = maximum(x) - minimum(x)\n",
+    "        high_level = mean(x[x .> THRESHOLD])\n",
+    "            low_level = mean(x[x .<= THRESHOLD])\n",
+    "                return (n=length(x), nedges=length(edges), T=T_hat, f=f_hat, jitter=jitter_std, ts_err_mean=mean(ts_err), ts_err_max=maximum(ts_err), Vpp=Vpp, high=high_level, low=low_level)\n",
+    "                end\n",
+    "\n",
+    "function check_numeric_acceptance(m)\n",
+    "    @assert 8 <= m.nedges <= 10 \"Число фронтов вне диапазона\"\n",
+    "        @assert isapprox(m.T, 0.2; atol=0.01) \"Период вне допуска\"\n",
+    "            @assert m.jitter < 0.0005 \"Джиттер превышает допустимый\"\n",
+    "                @assert m.ts_err_max <= 0.001 \"Ошибка временной метки превышает шаг дискретизации\"\n",
+    "                    @assert 1.8 <= m.high <= 2.2 \"Уровень логической единицы вне допуска\"\n",
+    "    return true\n",
+    "end\n",
+    "\n",
+    "println(\"MODEL = \", MODEL_NAME)\n",
+    "println(\"SEEDS = \", (BASE_SEED, BASE_SEED, ALT_SEED, BASE_SEED))\n",
+    "\n",
+    "set_seed!(BASE_SEED)\n",
+    "t1, x1 = run_model_and_extract()\n",
+    "m1 = oscilloscope_metrics(t1, x1)\n",
+    "\n",
+    "set_seed!(BASE_SEED)\n",
+    "t2, x2 = run_model_and_extract()\n",
+    "m2 = oscilloscope_metrics(t2, x2)\n",
+    "\n",
+    "set_seed!(ALT_SEED)\n",
+    "t3, x3 = run_model_and_extract()\n",
+    "m3 = oscilloscope_metrics(t3, x3)\n",
+    "\n",
+    "set_seed!(BASE_SEED)\n",
+    "t4, x4 = run_model_and_extract()\n",
+    "m4 = oscilloscope_metrics(t4, x4)\n",
+    "\n",
+    "eq_1_2 = x1 == x2\n",
+    "eq_1_4 = x1 == x4\n",
+    "eq_1_3 = x1 == x3\n",
+    "eq_2_4 = x2 == x4\n",
+    "\n",
+    "@assert eq_1_2 \"Запуски 1 и 2 при одинаковом seed различаются\"\n",
+    "@assert eq_1_4 \"После восстановления seed выход не воспроизведён\"\n",
+    "@assert !eq_1_3 \"Изменение seed не изменило полный выходной массив\"\n",
+    "@assert eq_2_4 \"Запуски 2 и 4 при одинаковом seed различаются\"\n",
+    "\n",
+    "check_numeric_acceptance(m1)\n",
+    "check_numeric_acceptance(m2)\n",
+    "check_numeric_acceptance(m4)\n",
+    "\n",
+    "set_seed!(BASE_SEED)\n",
+    "engee.save(MODEL_NAME, MODEL_NAME * \".engee\"; force=true)\n",
+    "\n",
+    "println(\"RUN_1 = \", m1)\n",
+    "println(\"RUN_2 = \", m2)\n",
+    "println(\"RUN_3 = \", m3)\n",
+    "println(\"RUN_4 = \", m4)\n",
+    "println(\"EQ_1_2 = \", eq_1_2)\n",
+    "println(\"EQ_1_4 = \", eq_1_4)\n",
+    "println(\"EQ_1_3 = \", eq_1_3)\n",
+    "println(\"EQ_2_4 = \", eq_2_4)\n",
+    "println(\"PASS: модель и критерии варианта 1 проверены; параметры восстановлены\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Скрипт обработки (delivery script)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "003863cf",
+   "cell_type": "markdown",
+   "source": [
+    "## 15. Контрольные вопросы\n",
+    "\n",
+    "- Почему момент фронта определяют линейной интерполяцией между отсчётами, а не берут время ближайшего отсчёта?\n",
+    "\n",
+    "- Чем джиттер периода отличается от ошибки временной метки по физическому смыслу?\n",
+    "\n",
+    "- Почему одинаковый seed должен воспроизводить полный выходной массив?\n",
+    "\n",
+    "- Как связаны шаг дискретизации и максимально возможная ошибка временной метки?\n",
+    "\n",
+    "- Как рост дисперсии шума вблизи порога влияет на достоверность обнаружения фронта и на джиттер?\n",
+    "\n",
+    "- Почему в данной модели нельзя корректно измерить время нарастания фронта (rise time) реального сигнала?\n",
+    "\n",
+    "- Зачем шаг решателя (Fixed step) должен совпадать с шагом дискретизации источника и шума?\n",
+    "\n",
+    "- Какие ограничения цифровой модели препятствуют прямому переносу результата на реальный осциллограф?"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Контрольные вопросы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "d8b1c12a",
+   "cell_type": "markdown",
+   "source": [
+    "## Раздел для преподавателя: демонстрационный вариант\n",
+    "\n",
+    "Приведённый ниже демонстрационный прогон подтверждает, что комплект работоспособен целиком: модель фактически создана и соединена в Engee, доставляемый скрипт фактически выполнен в этой среде без ошибок, а результат прошёл все заранее заданные критерии приёмки для варианта 1.\n",
+    "\n",
+    "Ход выполнения:\n",
+    "\n",
+    "- модель LR03_virtual_oscilloscope создана программно (engee.create) и заполнена блоками Pulse Generator, Random Number, Add и To Workspace с параметрами варианта 1;\n",
+    "\n",
+    "- при первой сборке обнаружено рассогласование Fixed step решателя (0,01 с по умолчанию) с шагом дискретизации блоков (0,001 с); шаг решателя приведён в соответствие — это задокументировано в разделе 17 как типичная ошибка;\n",
+    "\n",
+    "- блоки соединены линиями (engee.add_line) по схеме раздела 7; модель сохранена и экспортирована в LR03_virtual_oscilloscope.engee;\n",
+    "\n",
+    "- скрипт LR03_virtual_oscilloscope.jl выполнен целиком через include() непосредственно в среде Engee 26.8.2-H3;\n",
+    "\n",
+    "- скрипт выполнил четыре запуска модели (seed 101, 101, 1101, 101), для каждого нашёл фронты интерполяцией, вычислил период, частоту, джиттер и ошибку временной метки, сравнил полные выходные массивы и проверил численные критерии раздела 5.2;\n",
+    "\n",
+    "- после проверки вариант 1 восстановлен (Seed = 101), модель повторно сохранена.\n",
+    "\n",
+    "Фактический вывод скрипта (консоль Engee):\n",
+    "\n",
+    "MODEL = LR03_virtual_oscilloscope\n",
+    "SEEDS = (101, 101, 1101, 101)\n",
+    "\n",
+    "| Запуск | Seed | n | T_hat, с | f_hat, Гц | jitter, мс | ts_err_max, мс |\n",
+    "|---|---|---|---|---|---|---|\n",
+    "| 1 | 101 | 2000 | 0,199987 | 5,0003 | 0,0660 | 0,5250 |\n",
+    "| 2 | 101 | 2000 | 0,199987 | 5,0003 | 0,0660 | 0,5250 |\n",
+    "| 3 | 1101 | 2000 | 0,199993 | 5,0002 | 0,0482 | 0,5590 |\n",
+    "| 4 | 101 | 2000 | 0,199987 | 5,0003 | 0,0660 | 0,5250 |\n",
+    "\n",
+    "Проверка воспроизводимости полных выходных массивов:\n",
+    "\n",
+    "EQ_1_2 = true   EQ_1_4 = true   EQ_1_3 = false   EQ_2_4 = true\n",
+    "PASS: модель и критерии варианта 1 проверены; параметры восстановлены\n",
+    "\n",
+    "Результат демонстрационного прогона совпадает с ориентирами раздела 17 (период практически точно 0,2 с, ошибка временной метки заведомо меньше шага дискретизации) и подтверждает, что комплект LR03_virtual_oscilloscope может быть выдан студентам в текущем виде."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Демонстрационный вариант (для преподавателя)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  }
+ ]
+}

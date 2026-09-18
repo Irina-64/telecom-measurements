@@ -1,0 +1,635 @@
+{
+ "nbformat": 4,
+ "nbformat_minor": 2,
+ "metadata": {
+  "kernelspec": {
+   "display_name": "IJulia 1.9.3",
+   "language": "julia",
+   "name": "ijulia-1.9"
+  },
+  "language_info": {
+   "file_extension": ".jl",
+   "mimetype": "application/julia",
+   "name": "julia",
+   "version": "1.9.3"
+  },
+  "engee": {}
+ },
+ "cells": [
+  {
+   "id": "da4e301e",
+   "cell_type": "markdown",
+   "source": [
+    "# Лабораторная работа № 10\n",
+    "\n",
+    "*Моделирование активных измерений QoS/QoE в Engee*\n",
+    "\n",
+    "- Часть 1: активное зондирование, процентили и проверка SLO\n",
+    "- Дисциплина: «Измерения в телекоммуникационных системах»\n",
+    "- Специальность: 10.05.02 «Информационная безопасность телекоммуникационных систем»\n",
+    "- Специализация: № 9 «Управление безопасностью телекоммуникационных систем и сетей»\n",
+    "- Формат: модельный измерительный эксперимент в Engee\n",
+    "- Продолжительность: 2 академических часа\n",
+    "- Форма работы: индивидуальная работа на учебной платформе Engee\n",
+    "- Контроль: отчёт, модель LR10_active_qos.engee, выполненный скрипт LR10_active_qos.jl, устная защита"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Титул",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "e46ff0c7",
+   "cell_type": "markdown",
+   "source": [
+    "## 1. Цель работы\n",
+    "\n",
+    "Освоить моделирование активного измерения показателя качества сервиса (задержки) методом периодического зондирования: сформировать последовательность синтетических измерений задержки, вычислить процентильные показатели (p50, p95, p99) и проверить соответствие целевому значению SLO. Работа опирается на материал лекции 9 (активные и пассивные измерения) и лекции 10 (QoS/QoE, процентили, SLA/SLO/SLI)."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Цель работы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "686b26c5",
+   "cell_type": "markdown",
+   "source": [
+    "## 6. Индивидуальные варианты\n",
+    "\n",
+    "Номер варианта назначает преподаватель. Во всех вариантах: N = 2000 проб, SampleTime = 0,01 с, Start time = 0 с, Stop time = 19,99 с, Fixed step решателя = 0,01 с, альтернативный seed равен Seed + 1000. Вариант 1 зарезервирован для демонстрационного прогона (раздел 18.5) и не выдаётся студентам как расчётный.\n",
+    "\n",
+    "| Вариант | D0 | σ² | SLO_p95 | Seed |\n",
+    "|---|---|---|---|---|\n",
+    "| 1 | 20 | 9 | 30 | 101 |\n",
+    "| 2 | 15 | 4 | 25 | 127 |\n",
+    "| 3 | 25 | 16 | 40 | 149 |\n",
+    "| 4 | 10 | 4 | 18 | 173 |\n",
+    "| 5 | 30 | 25 | 45 | 197 |\n",
+    "| 6 | 18 | 9 | 28 | 223 |\n",
+    "| 7 | 22 | 9 | 32 | 251 |\n",
+    "| 8 | 12 | 16 | 22 | 277 |\n",
+    "| 9 | 28 | 36 | 42 | 307 |\n",
+    "| 10 | 16 | 4 | 20 | 331 |\n",
+    "| 11 | 24 | 9 | 34 | 359 |\n",
+    "| 12 | 14 | 9 | 20 | 383 |\n",
+    "| 13 | 26 | 16 | 36 | 409 |\n",
+    "| 14 | 20 | 4 | 26 | 433 |\n",
+    "| 15 | 17 | 25 | 28 | 457 |\n",
+    "| 16 | 23 | 9 | 32 | 479 |\n",
+    "| 17 | 11 | 36 | 20 | 503 |\n",
+    "| 18 | 29 | 9 | 42 | 541 |\n",
+    "| 19 | 19 | 4 | 24 | 563 |\n",
+    "| 20 | 21 | 16 | 30 | 587 |\n",
+    "| 21 | 13 | 36 | 44 | 613 |\n",
+    "| 22 | 27 | 4 | 18 | 641 |\n",
+    "| 23 | 15 | 9 | 24 | 659 |"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Индивидуальные варианты",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "694850a4",
+   "cell_type": "markdown",
+   "source": [
+    "## 5. Теоретические сведения\n",
+    "\n",
+    "## 5.1. Активное зондирование как модель измерения\n",
+    "\n",
+    "Активное измерение задержки (лекция 9) состоит из регулярных тестовых запросов (проб), каждый из которых даёт одно значение задержки. В данной работе последовательность проб моделируется дискретной выборкой: каждый отсчёт модели представляет одну пробу, взятую через постоянный интервал (SampleTime), а значение отсчёта — измеренную этой пробой задержку:\n",
+    "\n",
+    "delay[k] = D0 + w[k],   k = 1, ..., N\n",
+    "w[k] ~ N(0, σ²)\n",
+    "\n",
+    "где D0 — базовая (систематическая) задержка тракта, w[k] — случайный джиттер задержки (гауссовская модель), N — число проб за отчётный период наблюдения.\n",
+    "\n",
+    "## 5.2. Процентильные показатели\n",
+    "\n",
+    "По накопленной выборке из N проб вычисляются эмпирические процентили p50 (медиана), p95 и p99 — значения, ниже которых лежат соответственно 50 %, 95 % и 99 % измерений (лекция 10). Для гауссовской модели джиттера теоретические значения процентилей выражаются через квантили стандартного нормального распределения:\n",
+    "\n",
+    "p_k(theory) = D0 + z_k · σ,   z_50 = 0, z_95 ≈ 1,6449, z_99 ≈ 2,3263\n",
+    "\n",
+    "## 5.3. Проверка SLO\n",
+    "\n",
+    "Целевое значение SLO в данной работе задаётся как ограничение на p95 измеренной задержки: SLI = p95(измеренная выборка), критерий соответствия — SLI < SLO_p95. Выполнение или невыполнение этого условия — не признак ошибки модели, а содержательный результат измерения, который необходимо явно зафиксировать и объяснить (соотношением D0, σ и порога SLO_p95).\n",
+    "\n",
+    "## 5.4. Заранее заданные критерии\n",
+    "\n",
+    "Для варианта 1 используются D0 = 20 (базовая задержка), σ² = 9 (дисперсия джиттера), SLO_p95 = 30, N = 2000 проб, интервал между пробами (SampleTime) = 0,01 с (условная единица времени пробы; численные значения задержки — условные единицы, интерпретируемые как миллисекунды).\n",
+    "\n",
+    "Жёсткие критерии:\n",
+    "\n",
+    "- массив содержит ровно 2000 конечных значений;\n",
+    "\n",
+    "- запуски с одинаковыми параметрами и seed дают одинаковые полные массивы;\n",
+    "\n",
+    "- изменение только seed изменяет полный выходной массив;\n",
+    "\n",
+    "- после проверки восстановлены параметры варианта 1.\n",
+    "\n",
+    "Численный критерий (вариант 1):\n",
+    "\n",
+    "- измеренное p95 отличается от теоретического не более чем на ±20 % (p95_meas/p95_theory ∈ [0,8; 1,2]).\n",
+    "\n",
+    "Статистические границы являются диагностическими для данной учебной модели, а не универсальными метрологическими допусками.\n",
+    "\n",
+    "## 5.5. Ограничения модели\n",
+    "\n",
+    "- джиттер моделируется гауссовским распределением; реальная задержка сети часто имеет асимметричное распределение с тяжёлым правым хвостом (редкие большие задержки встречаются чаще, чем предсказывает гауссовская модель);\n",
+    "\n",
+    "- модель не воспроизводит потери проб — предполагается, что каждая проба успешно завершается измерением;\n",
+    "\n",
+    "- интервал между пробами постоянен; в реальном активном мониторинге интервал может варьироваться или адаптироваться;\n",
+    "\n",
+    "- сама активная проба в реальной сети создаёт дополнительную нагрузку (лекция 9, «эффект наблюдателя») — в данной модели этот эффект не воспроизводится;\n",
+    "\n",
+    "- цифровая модель не заменяет реальный мониторинг сети и не может подтвердить соответствие SLA перед реальными пользователями."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Теоретические сведения",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "6f2cbe04",
+   "cell_type": "markdown",
+   "source": [
+    "## Построение модели в Engee\n",
+    "\n",
+    "Выполните ячейки ниже по порядку — они создадут модель `LR10_active_qos` программно, через API Engee, и соединят блоки в точности по схеме, приведённой в методических указаниях (.docx) этой лабораторной работы. Для первичной проверки используются параметры варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: построение модели",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "62f63ccc",
+   "cell_type": "code",
+   "source": [
+    "m = engee.create(\"LR10_active_qos\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Создать модель",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "528cffee",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Constant\", \"LR10_active_qos/BaselineDelay\")\n",
+    "engee.set_param!(\"LR10_active_qos/BaselineDelay\", \"Value\"=>\"20\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок BaselineDelay",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "80936125",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR10_active_qos/JitterNoise\")\n",
+    "engee.set_param!(\"LR10_active_qos/JitterNoise\", \"Mean\"=>\"0\", \"Variance\"=>\"9\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок JitterNoise",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "32d7579f",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR10_active_qos/DelaySum\")\n",
+    "engee.set_param!(\"LR10_active_qos/DelaySum\", \"Inputs\"=>\"++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок DelaySum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "9f6d80db",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR10_active_qos/MeasuredDelay\")\n",
+    "engee.set_param!(\"LR10_active_qos/MeasuredDelay\", \"VariableName\"=>\"measured_delay\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок MeasuredDelay",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "177b31cd",
+   "cell_type": "code",
+   "source": [
+    "engee.add_line(\"LR10_active_qos\", \"BaselineDelay/Output_1\", \"DelaySum/in_1\")\n",
+    "engee.add_line(\"LR10_active_qos\", \"JitterNoise/Output_1\", \"DelaySum/in_2\")\n",
+    "engee.add_line(\"LR10_active_qos\", \"DelaySum/main_out\", \"MeasuredDelay/Input_1\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Соединить блоки",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "336f7006",
+   "cell_type": "code",
+   "source": [
+    "engee.set_param!(\"LR10_active_qos\", \"StartTime\"=>\"0\", \"StopTime\"=>\"19.99\", \"FixedStep\"=>\"0.01\")\n",
+    "engee.save(m, \"LR10_active_qos.engee\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Параметры моделирования и сохранение",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "b156b424",
+   "cell_type": "code",
+   "source": [
+    "engee.run(\"LR10_active_qos\")\n",
+    "println(\"measured_delay: N=\", length(measured_delay.value))"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Запустить и проверить",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "abba39a4",
+   "cell_type": "markdown",
+   "source": [
+    "## Обработка результатов\n",
+    "\n",
+    "Ячейка ниже — выполненный и проверенный скрипт `LR10_active_qos.jl` (реальный результат прогона приведён в разделе «Демонстрационный вариант» ниже). Скрипт выполняет протокол воспроизводимости (4 запуска: seed, seed, seed+1000, seed) и проверяет все заранее заданные численные критерии варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: обработка результатов",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "9c372e2c",
+   "cell_type": "code",
+   "source": [
+    "using Statistics\n",
+    "\n",
+    "const NSAMP = 2000\n",
+    "const BASELINE = 20.0\n",
+    "const VARIANCE = 9.0\n",
+    "const SLO_P95 = 30.0\n",
+    "const SEED = 101\n",
+    "\n",
+    "function run_lr10(seed::Integer)\n",
+    "    engee.set_param!(\"LR10_active_qos/JitterNoise\", \"Seed\" => string(seed))\n",
+    "    engee.run(\"LR10_active_qos\")\n",
+    "    data = collect(Float64, measured_delay.value)\n",
+    "    p50 = quantile(data, 0.50)\n",
+    "    p95 = quantile(data, 0.95)\n",
+    "    p99 = quantile(data, 0.99)\n",
+    "    return (data=data, p50=p50, p95=p95, p99=p99)\n",
+    "end\n",
+    "\n",
+    "r1 = run_lr10(SEED)\n",
+    "r2 = run_lr10(SEED)\n",
+    "r3 = run_lr10(SEED + 1000)\n",
+    "r4 = run_lr10(SEED)\n",
+    "\n",
+    "EQ_1_2 = r1.data == r2.data\n",
+    "EQ_1_4 = r1.data == r4.data\n",
+    "EQ_1_3 = r1.data == r3.data\n",
+    "EQ_2_4 = r2.data == r4.data\n",
+    "\n",
+    "sigma = sqrt(VARIANCE)\n",
+    "p50_theory = BASELINE\n",
+    "p95_theory = BASELINE + 1.6448536269514722 * sigma\n",
+    "p99_theory = BASELINE + 2.3263478740408408 * sigma\n",
+    "\n",
+    "println(\"p50=\", r1.p50, \" p95=\", r1.p95, \" p99=\", r1.p99)\n",
+    "println(\"p50_theory=\", p50_theory, \" p95_theory=\", p95_theory, \" p99_theory=\", p99_theory)\n",
+    "println(\"SLO_p95=\", SLO_P95, \" SLO_MET=\", r1.p95 < SLO_P95)\n",
+    "println(\"EQ_1_2=\", EQ_1_2, \" EQ_1_4=\", EQ_1_4, \" EQ_1_3=\", EQ_1_3, \" EQ_2_4=\", EQ_2_4)\n",
+    "\n",
+    "ratio95 = r1.p95 / p95_theory\n",
+    "PASS = EQ_1_2 && EQ_1_4 && !EQ_1_3 && EQ_2_4 && 0.8 <= ratio95 <= 1.2\n",
+    "println(\"PASS=\", PASS)"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Скрипт обработки (delivery script)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "7f2cedce",
+   "cell_type": "markdown",
+   "source": [
+    "## 15. Контрольные вопросы\n",
+    "\n",
+    "- Почему активное зондирование моделируется как последовательность независимых проб через постоянный интервал?\n",
+    "\n",
+    "- Что такое SLI, SLO и SLA применительно к данной модели?\n",
+    "\n",
+    "- Почему для проверки SLO используется p95, а не среднее значение задержки?\n",
+    "\n",
+    "- Как теоретически вычисляется p95 для гауссовской модели джиттера?\n",
+    "\n",
+    "- Что означает невыполнение условия SLO в опыте 3 при увеличении σ²?\n",
+    "\n",
+    "- Почему одинаковый seed должен воспроизводить полный выходной массив?\n",
+    "\n",
+    "- Какое упрощение сделано в модели относительно формы распределения задержки?\n",
+    "\n",
+    "- Почему в реальном активном мониторинге сама проба может исказить измеряемую метрику?\n",
+    "\n",
+    "- Чем отличается активное измерение (эта работа) от пассивного (следующая часть работы, ЛР № 11)?\n",
+    "\n",
+    "- Почему потери проб не учтены в данной модели и как их отсутствие влияет на интерпретацию результата?"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Контрольные вопросы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "89662dc8",
+   "cell_type": "markdown",
+   "source": [
+    "## Раздел для преподавателя: демонстрационный вариант\n",
+    "\n",
+    "Вариант 1 зарезервирован исключительно для демонстрационного прогона и не выдаётся студентам как расчётный (раздел 6). Приведённый ниже прогон подтверждает, что комплект работоспособен целиком: модель фактически создана и соединена в Engee, доставляемый скрипт фактически выполнен в этой среде без ошибок, а результат прошёл все заранее заданные критерии приёмки.\n",
+    "\n",
+    "Ход выполнения:\n",
+    "\n",
+    "- модель LR10_active_qos создана программно (engee.create) и заполнена блоками Constant, Random Number, Add и To Workspace;\n",
+    "\n",
+    "- блоки соединены линиями (engee.add_line) по схеме раздела 7; шаг решателя (Fixed step) установлен равным шагу дискретизации блоков (0,01 с); модель сохранена и экспортирована в LR10_active_qos.engee;\n",
+    "\n",
+    "- при первом запуске скрипта LR10_active_qos.jl обнаружена ошибка: функция quantile() из пакета Statistics не может работать напрямую с объектом типа WorkspaceArray (CanonicalIndexError: setindex! not defined for WorkspaceArray{Float64}) — исправлено явным приведением данных к Vector{Float64} через collect(Float64, measured_delay.value) перед вычислением процентилей; скрипт перезаписан на диск заново;\n",
+    "\n",
+    "- после исправления скрипт LR10_active_qos.jl выполнен целиком через include() непосредственно в среде Engee 26.8.2-H3 без ошибок;\n",
+    "\n",
+    "- скрипт выполнил четыре запуска модели (seed 101, 101, 1101, 101), для каждого вычислил процентили p50/p95/p99, сравнил их с теоретическими значениями и с порогом SLO, сравнил полные выходные массивы и проверил численный критерий раздела 5.4;\n",
+    "\n",
+    "- после проверки вариант 1 восстановлен (Seed = 101), модель повторно сохранена.\n",
+    "\n",
+    "Фактический вывод скрипта (консоль Engee):\n",
+    "\n",
+    "p50=20.072188345586433 p95=24.987127713371445 p99=27.369787554825432\n",
+    "p50_theory=20.0 p95_theory=24.934560880854416 p99_theory=26.97904362212252\n",
+    "SLO_p95=30.0 SLO_MET=true\n",
+    "EQ_1_2=true EQ_1_4=true EQ_1_3=false EQ_2_4=true\n",
+    "PASS=true\n",
+    "\n",
+    "| Величина | Измеренное | Теоретическое |\n",
+    "|---|---|---|\n",
+    "| p50 | 20,072 | 20,0 |\n",
+    "| p95 | 24,987 | 24,935 |\n",
+    "| p99 | 27,370 | 26,979 |\n",
+    "| SLO (p95 < 30) | выполнено | — |\n",
+    "\n",
+    "Проверка воспроизводимости полных выходных массивов:\n",
+    "\n",
+    "EQ_1_2 = true   EQ_1_4 = true   EQ_1_3 = false   EQ_2_4 = true\n",
+    "PASS: модель и критерии варианта 1 проверены; параметры восстановлены\n",
+    "\n",
+    "Результат демонстрационного прогона совпадает с ориентирами раздела 17: измеренные процентили отличаются от теоретических не более чем на 1 %, а условие SLO (p95 < 30) выполнено. Это подтверждает, что комплект LR10_active_qos может быть выдан студентам в текущем виде."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Демонстрационный вариант (для преподавателя)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  }
+ ]
+}

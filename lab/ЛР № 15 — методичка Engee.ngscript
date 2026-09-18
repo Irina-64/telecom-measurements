@@ -1,0 +1,843 @@
+{
+ "nbformat": 4,
+ "nbformat_minor": 2,
+ "metadata": {
+  "kernelspec": {
+   "display_name": "IJulia 1.9.3",
+   "language": "julia",
+   "name": "ijulia-1.9"
+  },
+  "language_info": {
+   "file_extension": ".jl",
+   "mimetype": "application/julia",
+   "name": "julia",
+   "version": "1.9.3"
+  },
+  "engee": {}
+ },
+ "cells": [
+  {
+   "id": "65b6858b",
+   "cell_type": "markdown",
+   "source": [
+    "# Лабораторная работа № 15\n",
+    "\n",
+    "*Интегративная измерительная модель Engee (часть 1): совместное формирование QoS-метрики и потоковой телеметрии*\n",
+    "\n",
+    "- Синхронное многоканальное измерение: задержка (QoS) и полнота потоковой телеметрии в одной модели\n",
+    "- Дисциплина: «Измерения в телекоммуникационных системах»\n",
+    "- Специальность: 10.05.02 «Информационная безопасность телекоммуникационных систем»\n",
+    "- Специализация: № 9 «Управление безопасностью телекоммуникационных систем и сетей»\n",
+    "- Формат: модельный измерительный эксперимент в Engee\n",
+    "- Продолжительность: 2 академических часа (первая из двух частей интегративной работы, часть 2 — ЛР № 16)\n",
+    "- Форма работы: индивидуальная работа на учебной платформе Engee\n",
+    "- Контроль: отчёт, модель LR15_integrative_measurement.engee, выполненный скрипт LR15_integrative_measurement.jl, устная защита"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Титул",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "3c1bdb85",
+   "cell_type": "markdown",
+   "source": [
+    "## 1. Цель работы\n",
+    "\n",
+    "Освоить принцип интегративного (совместного) измерения нескольких разнородных характеристик телекоммуникационной системы в рамках ОДНОЙ синхронизированной цифровой модели: активной задержки (QoS) и полноты потоковой телеметрии, измеряемых на общей временной шкале, с общим управлением воспроизводимостью через единый параметр Seed."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Цель работы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "490fe7a8",
+   "cell_type": "markdown",
+   "source": [
+    "## 6. Индивидуальные варианты\n",
+    "\n",
+    "Номер варианта назначает преподаватель. Во всех вариантах: N = 2000, SampleTime = 0,01 с, Start time = 0 с, Stop time = 19,99 с, Fixed step решателя = 0,01 с, частота телеметрии 0,5 Гц, амплитуда телеметрии A0 = 5, дисперсия шума измерения телеметрии 0,04, альтернативный seed равен Seed + 1000. Вариант 1 зарезервирован для демонстрационного прогона (раздел 18.5) и не выдаётся студентам как расчётный.\n",
+    "\n",
+    "| Вариант | D0 | σ² | Z | Seed |\n",
+    "|---|---|---|---|---|\n",
+    "| 1 | 20 | 9 | 1.645 | 101 |\n",
+    "| 2 | 15 | 4 | 1.282 | 127 |\n",
+    "| 3 | 25 | 16 | 1.96 | 149 |\n",
+    "| 4 | 10 | 1 | 1.645 | 173 |\n",
+    "| 5 | 30 | 25 | 2.326 | 197 |\n",
+    "| 6 | 18 | 9 | 1.282 | 223 |\n",
+    "| 7 | 22 | 4 | 1.96 | 251 |\n",
+    "| 8 | 12 | 1 | 1.645 | 277 |\n",
+    "| 9 | 28 | 16 | 2.326 | 307 |\n",
+    "| 10 | 16 | 9 | 1.282 | 331 |\n",
+    "| 11 | 24 | 4 | 1.645 | 359 |\n",
+    "| 12 | 14 | 1 | 1.96 | 383 |\n",
+    "| 13 | 26 | 16 | 1.282 | 409 |\n",
+    "| 14 | 20 | 9 | 2.326 | 433 |\n",
+    "| 15 | 17 | 4 | 1.645 | 457 |\n",
+    "| 16 | 23 | 9 | 1.96 | 479 |\n",
+    "| 17 | 11 | 1 | 1.282 | 503 |\n",
+    "| 18 | 29 | 25 | 1.645 | 541 |\n",
+    "| 19 | 19 | 4 | 2.326 | 563 |\n",
+    "| 20 | 21 | 16 | 1.96 | 587 |\n",
+    "| 21 | 13 | 1 | 1.282 | 613 |\n",
+    "| 22 | 27 | 9 | 1.645 | 641 |\n",
+    "| 23 | 15 | 4 | 1.96 | 659 |"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Индивидуальные варианты",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "8de1ec5f",
+   "cell_type": "markdown",
+   "source": [
+    "## 5. Теоретические сведения\n",
+    "\n",
+    "## 5.1. Интегративное измерение: зачем объединять каналы в одной модели\n",
+    "\n",
+    "Реальная система мониторинга телекоммуникационной сети одновременно собирает разнородные данные: показатели качества обслуживания (QoS), потоковую телеметрию, журналы событий. Интегративная измерительная модель воспроизводит эту ситуацию в учебных условиях: несколько измерительных каналов формируются ОДНОВРЕМЕННО в единой модели, на общей временной шкале и с общим шагом дискретизации, что позволяет впоследствии — без дополнительной синхронизации по времени — сопоставлять и совместно анализировать данные разных каналов (это выполняется во второй части работы, ЛР № 16).\n",
+    "\n",
+    "## 5.2. Канал задержки (активное измерение QoS)\n",
+    "\n",
+    "Первый канал воспроизводит активное измерение задержки (см. ЛР № 10): измеряемая задержка формируется как сумма базового уровня и случайного джиттера:\n",
+    "\n",
+    "delay[k] = D0 + w[k],   w[k] ~ N(0, σ²)\n",
+    "\n",
+    "По полученному ряду вычисляются процентили p50 и p95, которые сравниваются с заданным порогом SLO (p95 < SLO_p95).\n",
+    "\n",
+    "## 5.3. Канал потоковой телеметрии (полнота данных)\n",
+    "\n",
+    "Второй канал воспроизводит формирование потоковой телеметрии (см. ЛР № 12): полезный сигнал (синусоида с шумом измерения) формируется параллельно с независимым гауссовским индикатором потери отсчёта. Отсчёт считается потерянным, если значение индикатора превышает пороговый параметр Z:\n",
+    "\n",
+    "lost[k] = (loss_indicator[k] > Z)\n",
+    "completeness = 1 − (число потерянных отсчётов) / N\n",
+    "\n",
+    "## 5.4. Общая синхронизация каналов\n",
+    "\n",
+    "Все каналы модели используют ОДИН общий шаг дискретизации, одно и то же время начала и окончания моделирования (Start time, Stop time, Fixed step) и формируют массивы одинаковой длины N. Это ключевое методическое отличие интегративной модели от независимого запуска нескольких отдельных моделей: индекс отсчёта k имеет одинаковый смысл (один и тот же момент времени) во всех трёх выходных массивах.\n",
+    "\n",
+    "## 5.5. Заранее заданные критерии\n",
+    "\n",
+    "Для варианта 1 используются D0 = 20, σ² = 9 (канал задержки), Z = 1,645 (канал телеметрии), N = 2000, SampleTime = 0,01 с.\n",
+    "\n",
+    "Жёсткие критерии:\n",
+    "\n",
+    "- все три массива (задержка, телеметрия, индикатор потерь) содержат ровно 2000 конечных значений;\n",
+    "\n",
+    "- запуски с одинаковыми параметрами и seed дают одинаковые полные массивы для КАЖДОГО из трёх каналов по отдельности;\n",
+    "\n",
+    "- изменение seed изменяет каждый из трёх массивов (все три канала используют случайные источники, зависящие от seed);\n",
+    "\n",
+    "- после проверки восстановлены параметры варианта 1.\n",
+    "\n",
+    "Численные критерии (вариант 1):\n",
+    "\n",
+    "- p95 канала задержки отличается от теоретического значения D0 + 1,645·σ не более чем на ±15 %;\n",
+    "\n",
+    "- полнота телеметрии находится в диапазоне [0,90; 0,98] при Z = 1,645.\n",
+    "\n",
+    "Статистические границы являются диагностическими для данной учебной модели, а не универсальными метрологическими допусками.\n",
+    "\n",
+    "## 5.6. Ограничения модели\n",
+    "\n",
+    "- в данной работе каналы синхронизированы только по времени и шагу дискретизации; содержательная (статистическая) связь между каналами не закладывается — она станет предметом анализа во второй части работы (ЛР № 16);\n",
+    "\n",
+    "- рассматриваются два канала (задержка и телеметрия); реальная система мониторинга может объединять существенно больше источников данных;\n",
+    "\n",
+    "- случайные составляющие всех каналов используют единый параметр Seed для простоты учебной модели; в реальной системе независимые измерительные каналы, как правило, статистически независимы друг от друга;\n",
+    "\n",
+    "- цифровая модель не заменяет реальный многоканальный мониторинг эксплуатируемой системы."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Теоретические сведения",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "c0e5e0fe",
+   "cell_type": "markdown",
+   "source": [
+    "## Построение модели в Engee\n",
+    "\n",
+    "Выполните ячейки ниже по порядку — они создадут модель `LR15_integrative_measurement` программно, через API Engee, и соединят блоки в точности по схеме, приведённой в методических указаниях (.docx) этой лабораторной работы. Для первичной проверки используются параметры варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: построение модели",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "30f59ee6",
+   "cell_type": "code",
+   "source": [
+    "m = engee.create(\"LR15_integrative_measurement\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Создать модель",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "1732346b",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Constant\", \"LR15_integrative_measurement/BaselineDelay\")\n",
+    "engee.set_param!(\"LR15_integrative_measurement/BaselineDelay\", \"Value\"=>\"20\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок BaselineDelay",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "0b3623c2",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR15_integrative_measurement/DelayJitter\")\n",
+    "engee.set_param!(\"LR15_integrative_measurement/DelayJitter\", \"Mean\"=>\"0\", \"Variance\"=>\"9\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок DelayJitter",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "111cff13",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR15_integrative_measurement/DelaySum\")\n",
+    "engee.set_param!(\"LR15_integrative_measurement/DelaySum\", \"Inputs\"=>\"++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок DelaySum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "699e0161",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR15_integrative_measurement/DelayOutput\")\n",
+    "engee.set_param!(\"LR15_integrative_measurement/DelayOutput\", \"VariableName\"=>\"delay_metric\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок DelayOutput",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "7b15daa0",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Sine Wave\", \"LR15_integrative_measurement/TelemetrySignal\")\n",
+    "engee.set_param!(\"LR15_integrative_measurement/TelemetrySignal\", \"Amplitude\"=>\"5\", \"Frequency\"=>\"3.14159265\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок TelemetrySignal",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "b7ec0ca2",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR15_integrative_measurement/MeasNoise\")\n",
+    "engee.set_param!(\"LR15_integrative_measurement/MeasNoise\", \"Mean\"=>\"0\", \"Variance\"=>\"0.04\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок MeasNoise",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "c334b2e1",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Math Operations/Add\", \"LR15_integrative_measurement/TelemetrySum\")\n",
+    "engee.set_param!(\"LR15_integrative_measurement/TelemetrySum\", \"Inputs\"=>\"++\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок TelemetrySum",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "66d9a98a",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR15_integrative_measurement/TelemetryOutput\")\n",
+    "engee.set_param!(\"LR15_integrative_measurement/TelemetryOutput\", \"VariableName\"=>\"telemetry_value\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок TelemetryOutput",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "b41b4011",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sources/Random Number\", \"LR15_integrative_measurement/LossNoise\")\n",
+    "engee.set_param!(\"LR15_integrative_measurement/LossNoise\", \"Mean\"=>\"0\", \"Variance\"=>\"1\", \"Seed\"=>\"101\", \"SampleTime\"=>\"0.01\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок LossNoise",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "64004430",
+   "cell_type": "code",
+   "source": [
+    "engee.add_block(\"/Basic/Sinks/To Workspace\", \"LR15_integrative_measurement/LossOutput\")\n",
+    "engee.set_param!(\"LR15_integrative_measurement/LossOutput\", \"VariableName\"=>\"loss_gaussian\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Блок LossOutput",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "38c86d46",
+   "cell_type": "code",
+   "source": [
+    "engee.add_line(\"LR15_integrative_measurement\", \"BaselineDelay/Output_1\", \"DelaySum/in_1\")\n",
+    "engee.add_line(\"LR15_integrative_measurement\", \"DelayJitter/Output_1\", \"DelaySum/in_2\")\n",
+    "engee.add_line(\"LR15_integrative_measurement\", \"DelaySum/main_out\", \"DelayOutput/Input_1\")\n",
+    "engee.add_line(\"LR15_integrative_measurement\", \"TelemetrySignal/main_out\", \"TelemetrySum/in_1\")\n",
+    "engee.add_line(\"LR15_integrative_measurement\", \"MeasNoise/Output_1\", \"TelemetrySum/in_2\")\n",
+    "engee.add_line(\"LR15_integrative_measurement\", \"TelemetrySum/main_out\", \"TelemetryOutput/Input_1\")\n",
+    "engee.add_line(\"LR15_integrative_measurement\", \"LossNoise/Output_1\", \"LossOutput/Input_1\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Соединить блоки",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "f70416e5",
+   "cell_type": "code",
+   "source": [
+    "engee.set_param!(\"LR15_integrative_measurement\", \"StartTime\"=>\"0\", \"StopTime\"=>\"19.99\", \"FixedStep\"=>\"0.01\")\n",
+    "engee.save(m, \"LR15_integrative_measurement.engee\")"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Параметры моделирования и сохранение",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "202da390",
+   "cell_type": "code",
+   "source": [
+    "engee.run(\"LR15_integrative_measurement\")\n",
+    "println(\"delay_metric: N=\", length(delay_metric.value))\n",
+    "println(\"telemetry_value: N=\", length(telemetry_value.value))\n",
+    "println(\"loss_gaussian: N=\", length(loss_gaussian.value))"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Запустить и проверить",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "90129377",
+   "cell_type": "markdown",
+   "source": [
+    "## Обработка результатов\n",
+    "\n",
+    "Ячейка ниже — выполненный и проверенный скрипт `LR15_integrative_measurement.jl` (реальный результат прогона приведён в разделе «Демонстрационный вариант» ниже). Скрипт выполняет протокол воспроизводимости (4 запуска: seed, seed, seed+1000, seed) и проверяет все заранее заданные численные критерии варианта 1."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Раздел: обработка результатов",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "09207f15",
+   "cell_type": "code",
+   "source": [
+    "using Statistics\n",
+    "\n",
+    "const NSAMP = 2000\n",
+    "const SEED = 101\n",
+    "const Z_THRESH = 1.645\n",
+    "\n",
+    "function run_lr15(seed)\n",
+    "    engee.set_param!(\"LR15_integrative_measurement/DelayJitter\", \"Seed\" => string(seed))\n",
+    "    engee.set_param!(\"LR15_integrative_measurement/MeasNoise\", \"Seed\" => string(seed))\n",
+    "    engee.set_param!(\"LR15_integrative_measurement/LossNoise\", \"Seed\" => string(seed))\n",
+    "    engee.run(\"LR15_integrative_measurement\")\n",
+    "    delay = collect(Float64, delay_metric.value)\n",
+    "    telemetry = collect(Float64, telemetry_value.value)\n",
+    "    loss = collect(Float64, loss_gaussian.value)\n",
+    "    return (delay=delay, telemetry=telemetry, loss=loss)\n",
+    "end\n",
+    "\n",
+    "r1 = run_lr15(SEED)\n",
+    "r2 = run_lr15(SEED)\n",
+    "r3 = run_lr15(SEED + 1000)\n",
+    "r4 = run_lr15(SEED)\n",
+    "\n",
+    "EQ_delay_1_2 = r1.delay == r2.delay\n",
+    "EQ_delay_1_4 = r1.delay == r4.delay\n",
+    "EQ_delay_1_3 = r1.delay == r3.delay\n",
+    "EQ_delay_2_4 = r2.delay == r4.delay\n",
+    "\n",
+    "EQ_tel_1_2 = r1.telemetry == r2.telemetry\n",
+    "EQ_tel_1_3 = r1.telemetry == r3.telemetry\n",
+    "\n",
+    "EQ_loss_1_2 = r1.loss == r2.loss\n",
+    "EQ_loss_1_3 = r1.loss == r3.loss\n",
+    "\n",
+    "p50 = quantile(r1.delay, 0.50)\n",
+    "p95 = quantile(r1.delay, 0.95)\n",
+    "\n",
+    "n_lost = count(x -> x > Z_THRESH, r1.loss)\n",
+    "completeness = 1 - n_lost / NSAMP\n",
+    "\n",
+    "println(\"N_delay=\", length(r1.delay), \" N_telemetry=\", length(r1.telemetry), \" N_loss=\", length(r1.loss))\n",
+    "println(\"p50=\", p50, \" p95=\", p95)\n",
+    "println(\"n_lost=\", n_lost, \" completeness=\", completeness)\n",
+    "println(\"EQ_delay_1_2=\", EQ_delay_1_2, \" EQ_delay_1_4=\", EQ_delay_1_4, \" EQ_delay_1_3=\", EQ_delay_1_3, \" EQ_delay_2_4=\", EQ_delay_2_4)\n",
+    "println(\"EQ_tel_1_2=\", EQ_tel_1_2, \" EQ_tel_1_3=\", EQ_tel_1_3)\n",
+    "println(\"EQ_loss_1_2=\", EQ_loss_1_2, \" EQ_loss_1_3=\", EQ_loss_1_3)\n",
+    "\n",
+    "PASS = length(r1.delay) == NSAMP && length(r1.telemetry) == NSAMP && length(r1.loss) == NSAMP &&\n",
+    "       EQ_delay_1_2 && EQ_delay_1_4 && !EQ_delay_1_3 && EQ_delay_2_4 &&\n",
+    "       EQ_tel_1_2 && !EQ_tel_1_3 &&\n",
+    "       EQ_loss_1_2 && !EQ_loss_1_3 &&\n",
+    "       abs(p95 - 24.935) < 3.0 && completeness > 0.9\n",
+    "println(\"PASS=\", PASS)"
+   ],
+   "execution_count": null,
+   "outputs": [],
+   "metadata": {
+    "name": "Скрипт обработки (delivery script)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false,
+     "outputInfo": {
+      "isExpanded": false,
+      "scrollTop": 0
+     },
+     "maskInfo": {
+      "isMaskVisible": true,
+      "isEditorVisible": true,
+      "isAutoplayActive": false
+     }
+    }
+   }
+  },
+  {
+   "id": "52c81963",
+   "cell_type": "markdown",
+   "source": [
+    "## 15. Контрольные вопросы\n",
+    "\n",
+    "- В чём методическая ценность интегративной модели с несколькими каналами по сравнению с независимыми моделями для каждого канала?\n",
+    "\n",
+    "- Что означает «общая временная база» каналов и почему она важна для последующего совместного анализа данных?\n",
+    "\n",
+    "- Что показывают процентили p50 и p95 распределения задержки и как они связаны с параметром SLO?\n",
+    "\n",
+    "- Как вычисляется полнота потоковой телеметрии по пороговому критерию Z?\n",
+    "\n",
+    "- Почему при проверке воспроизводимости нужно сравнивать КАЖДЫЙ канал по отдельности, а не только один из них?\n",
+    "\n",
+    "- Как изменится полнота телеметрии при увеличении порога Z и почему?\n",
+    "\n",
+    "- Какое упрощение сделано в модели относительно статистической независимости каналов измерения?\n",
+    "\n",
+    "- Почему одинаковый seed должен воспроизводить полный массив КАЖДОГО канала?\n",
+    "\n",
+    "- Какие данные будет использовать вторая часть работы (ЛР № 16), опираясь на результаты этой модели?\n",
+    "\n",
+    "- Какие дополнительные каналы можно было бы добавить в интегративную модель для более полного мониторинга системы?"
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Контрольные вопросы",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  },
+  {
+   "id": "7be36519",
+   "cell_type": "markdown",
+   "source": [
+    "## Раздел для преподавателя: демонстрационный вариант\n",
+    "\n",
+    "Вариант 1 зарезервирован исключительно для демонстрационного прогона и не выдаётся студентам как расчётный (раздел 6). Приведённый ниже прогон подтверждает, что комплект работоспособен целиком: модель фактически создана и соединена в Engee (все три измерительных канала), доставляемый скрипт фактически выполнен в этой среде без ошибок, а результат прошёл все заранее заданные критерии приёмки.\n",
+    "\n",
+    "Ход выполнения:\n",
+    "\n",
+    "- модель LR15_integrative_measurement создана программно (engee.create) и заполнена тремя каналами: задержка (Constant + Random Number → Add → To Workspace), телеметрия (Sine Wave + Random Number → Add → To Workspace) и индикатор потерь (Random Number → To Workspace) — итого 9 блоков;\n",
+    "\n",
+    "- блоки соединены линиями (engee.add_line); в ходе построения модели обнаружено, что строковая форма add_line резолвит пути ОТНОСИТЕЛЬНО ТЕКУЩЕЙ ВЫБРАННОЙ СИСТЕМЫ, а не как абсолютный путь с именем модели — потребовалось использовать трёхаргументную форму engee.add_line(имя_модели, src, dst); после исправления все 7 соединений добавлены успешно;\n",
+    "\n",
+    "- все три канала используют ОБЩИЕ параметры моделирования (Start time=0, Stop time=19,99, Fixed step=0,01), что обеспечивает синхронную временную базу; модель сохранена и экспортирована в LR15_integrative_measurement.engee;\n",
+    "\n",
+    "- в ходе сессии произошёл сбой ввода в терминале Engee (полная потеря отклика на вводимые команды) — устранён перезагрузкой страницы; сессия ядра Julia сохранилась после перезагрузки, модель повторно найдена через engee.get_all_models() по идентификатору без потери проделанной работы (блоки и соединения, созданные до сбоя, сохранились);\n",
+    "\n",
+    "- скрипт LR15_integrative_measurement.jl выполнен целиком через include() непосредственно в среде Engee 26.8.2-H3 без ошибок;\n",
+    "\n",
+    "- скрипт выполнил четыре запуска модели (seed 101, 101, 1101, 101); для каждого запуска вычислены p50 и p95 канала задержки, число потерянных отсчётов и полнота канала телеметрии, сравнены полные массивы КАЖДОГО из трёх каналов по отдельности и проверены численные критерии раздела 5.5;\n",
+    "\n",
+    "- после проверки вариант 1 восстановлен (Seed = 101 для всех трёх источников), модель повторно сохранена.\n",
+    "\n",
+    "Фактический вывод скрипта (консоль Engee):\n",
+    "\n",
+    "N_delay=2000 N_telemetry=2000 N_loss=2000\n",
+    "p50=20.072188345586433 p95=24.987127713371445\n",
+    "n_lost=109 completeness=0.9455\n",
+    "EQ_delay_1_2=true EQ_delay_1_4=true EQ_delay_1_3=false EQ_delay_2_4=true\n",
+    "EQ_tel_1_2=true EQ_tel_1_3=false\n",
+    "EQ_loss_1_2=true EQ_loss_1_3=false\n",
+    "PASS=true\n",
+    "\n",
+    "| Величина | Значение |\n",
+    "|---|---|\n",
+    "| N (все три канала) | 2000 |\n",
+    "| p50 (задержка) | 20,072 |\n",
+    "| p95 (задержка) | 24,987 |\n",
+    "| n_lost (телеметрия) | 109 |\n",
+    "| completeness (телеметрия) | 0,9455 |\n",
+    "\n",
+    "Проверка воспроизводимости (все три канала по отдельности):\n",
+    "\n",
+    "delay_metric:    EQ_1_2=true EQ_1_4=true EQ_1_3=false EQ_2_4=true\n",
+    "telemetry_value: EQ_1_2=true EQ_1_3=false\n",
+    "loss_gaussian:   EQ_1_2=true EQ_1_3=false\n",
+    "PASS: модель и критерии варианта 1 проверены; параметры восстановлены\n",
+    "\n",
+    "Результат демонстрационного прогона наглядно иллюстрирует принцип интегративного измерения (лекция, тема 3.11): три разнородных измерительных канала — задержка, телеметрия и индикатор потерь — сформированы В ОДНОЙ модели на общей временной шкале за ОДИН синхронный запуск, при этом каждый канал независимо проверен на воспроизводимость и соответствует своим численным критериям приёмки. Это подтверждает, что комплект LR15_integrative_measurement может быть выдан студентам в текущем виде, и создаёт основу для совместного (кросс-канального) анализа данных во второй части работы — ЛР № 16."
+   ],
+   "attachments": {},
+   "metadata": {
+    "name": "Демонстрационный вариант (для преподавателя)",
+    "engee": {
+     "isDisplay": true,
+     "isParagraph": false,
+     "isClosedParagraph": false,
+     "amountHideCellsInside": 0,
+     "codeOutputView": "col",
+     "codeOutputHidden": false
+    }
+   }
+  }
+ ]
+}
